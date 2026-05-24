@@ -12,7 +12,8 @@ st.set_page_config(page_title="Visor MEF 360 - Dashboard Ciudadano", page_icon="
 def get_processor():
     csv_path = r"C:\Users\marx_\Downloads\2026-Gasto-Diario.csv"
     parquet_path = "2026-Gasto-Diario.parquet"
-    return MEFDataProcessor(csv_path, parquet_path)
+    with st.spinner("Descargando base de datos segura a la nube (solo ocurre en el primer reinicio). Esto tomará un par de minutos, no cierres la ventana..."):
+        return MEFDataProcessor(csv_path, parquet_path)
 
 processor = get_processor()
 

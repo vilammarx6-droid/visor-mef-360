@@ -5,7 +5,6 @@ import streamlit as st
 
 class MEFDataProcessor:
     def __init__(self, csv_path=None, parquet_path=None):
-        # Placeholder para evitar AttributeError en las f-strings antiguas
         self.parquet_path = "mef_data"
         self.cloud_urls = [
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2026-Gasto-Diario.parquet",
@@ -13,6 +12,24 @@ class MEFDataProcessor:
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2024-Gasto-Diario.parquet",
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2023-Gasto-Diario.parquet"
         ]
+        
+        # Streamlit Cloud Protection: Avoid HuggingFace Rate Limits (HTTPException)
+        # We download the files to /tmp once per container lifecycle.
+        import os
+        if os.environ.get('STREAMLIT_RUNTIME_ENV') is not None:
+            import urllib.request
+            tmp_dir = "/tmp"
+            local_urls = []
+            for url in self.cloud_urls:
+                filename = url.split('/')[-1]
+                local_path = os.path.join(tmp_dir, filename)
+                if not os.path.exists(local_path):
+                    try:
+                        urllib.request.urlretrieve(url, local_path)
+                    except Exception:
+                        local_path = url # Fallback to HTTPFS if download fails
+                local_urls.append(local_path)
+            self.cloud_urls = local_urls
 
     def _get_table_str(self):
         urls_str = ", ".join([f"'{url}'" for url in self.cloud_urls])
