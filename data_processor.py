@@ -12,11 +12,11 @@ class MEFDataProcessor:
         # Si la ruta de Windows (C:\) no existe, sabemos con 100% de seguridad que estamos en el servidor Linux de Streamlit.
         self.is_cloud = not os.path.exists(self.csv_path) and not os.path.exists(self.parquet_path)
         
-        # Enlaces de la Nube (Hugging Face Datasets) - ¡AQUÍ ACTUALIZAS LOS AÑOS!
         self.cloud_urls_raw = [
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2026-Gasto-Diario.parquet",
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2025-Gasto-Diario.parquet",
-            "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2024-Gasto-Diario.parquet"
+            "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2024-Gasto-Diario.parquet",
+            "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2023-Gasto-Diario.parquet"
         ]
         self.cloud_urls = []
 
