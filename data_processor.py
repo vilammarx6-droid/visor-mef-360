@@ -9,7 +9,8 @@ class MEFDataProcessor:
         self.parquet_path = parquet_path
         
         # Detector Automático de Entorno Nube (Streamlit Cloud)
-        self.is_cloud = os.environ.get('STREAMLIT_RUNTIME_ENV') is not None
+        # Si la ruta de Windows (C:\) no existe, sabemos con 100% de seguridad que estamos en el servidor Linux de Streamlit.
+        self.is_cloud = not os.path.exists(self.csv_path) and not os.path.exists(self.parquet_path)
         
         # Enlaces de la Nube (Hugging Face Datasets) - ¡AQUÍ ACTUALIZAS LOS AÑOS!
         self.cloud_urls = [
