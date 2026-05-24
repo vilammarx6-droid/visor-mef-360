@@ -3,6 +3,17 @@ import os
 import pandas as pd
 import streamlit as st
 
+# Función global cacheada para evitar bloqueos de Hugging Face cuando múltiples usuarios entran
+@st.cache_data(ttl=3600, show_spinner=False)
+def _cached_duckdb_query(safe_query):
+    conn = duckdb.connect()
+    try:
+        conn.execute("INSTALL httpfs; LOAD httpfs;")
+        conn.execute("SET http_keep_alive=false; SET http_retries=10; SET http_retry_wait_ms=1000;")
+        return conn.execute(safe_query).df()
+    finally:
+        conn.close()
+
 class MEFDataProcessor:
     def __init__(self, csv_path=None, parquet_path=None):
         self.parquet_path = "mef_data"
