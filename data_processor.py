@@ -13,15 +13,34 @@ class MEFDataProcessor:
         self.is_cloud = not os.path.exists(self.csv_path) and not os.path.exists(self.parquet_path)
         
         # Enlaces de la Nube (Hugging Face Datasets) - ¡AQUÍ ACTUALIZAS LOS AÑOS!
-        self.cloud_urls = [
+        self.cloud_urls_raw = [
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2026-Gasto-Diario.parquet",
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2025-Gasto-Diario.parquet",
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2024-Gasto-Diario.parquet"
         ]
+        self.cloud_urls = []
 
-        # Solo buscar/crear archivos locales si NO estamos en la nube
-        if not self.is_cloud:
+        if self.is_cloud:
+            self._ensure_cloud_data()
+        else:
             self._ensure_parquet()
+
+    def _ensure_cloud_data(self):
+        import urllib.request
+        for url in self.cloud_urls_raw:
+            filename = url.split('/')[-1]
+            # Usar el directorio de trabajo temporal /tmp en Linux
+            local_path = os.path.join('/tmp', filename)
+            self.cloud_urls.append(local_path)
+            
+            if not os.path.exists(local_path):
+                with st.spinner(f"Descargando datos desde la nube: {filename} ... (Esto solo ocurre la primera vez que enciendes el servidor)"):
+                    try:
+                        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+                        with urllib.request.urlopen(req) as response, open(local_path, 'wb') as out_file:
+                            out_file.write(response.read())
+                    except Exception as e:
+                        st.error(f"Error descargando {filename}: {e}")
 
     def _ensure_parquet(self):
         """Converts the CSV to a Parquet file if it doesn't exist for massive speedup."""
@@ -43,7 +62,7 @@ class MEFDataProcessor:
         conn = duckdb.connect()
         try:
             if self.is_cloud:
-                conn.execute("INSTALL httpfs; LOAD httpfs;")
+                # Ya no necesitamos httpfs, leemos de los archivos descargados en /tmp
                 urls_str = ", ".join([f"'{url}'" for url in self.cloud_urls])
                 data_source = f"read_parquet([{urls_str}])"
             else:
