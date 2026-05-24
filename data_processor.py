@@ -13,11 +13,14 @@ class MEFDataProcessor:
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2023-Gasto-Diario.parquet"
         ]
         
-        # Streamlit Cloud Protection: Avoid HuggingFace Rate Limits (HTTPException)
-        # We download the files to /tmp once per container lifecycle.
+        # Streamlit Cloud Protection: Descargar a /tmp para evitar Rate Limits
         import os
-        if os.environ.get('STREAMLIT_RUNTIME_ENV') is not None:
-            import urllib.request
+        import streamlit as st
+        # Verificamos si estamos en Linux (Streamlit Cloud suele estar en /mount/src o /home/adminuser)
+        self.is_cloud = os.path.exists('/mount/src') or os.path.exists('/home/adminuser')
+        
+        if self.is_cloud:
+            import requests
             tmp_dir = "/tmp"
             local_urls = []
             for url in self.cloud_urls:
@@ -25,9 +28,16 @@ class MEFDataProcessor:
                 local_path = os.path.join(tmp_dir, filename)
                 if not os.path.exists(local_path):
                     try:
-                        urllib.request.urlretrieve(url, local_path)
-                    except Exception:
-                        local_path = url # Fallback to HTTPFS if download fails
+                        # Stream download with User-Agent
+                        headers = {'User-Agent': 'Mozilla/5.0'}
+                        response = requests.get(url, stream=True, headers=headers)
+                        response.raise_for_status()
+                        with open(local_path, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                f.write(chunk)
+                    except Exception as e:
+                        st.error(f"Error descargando {filename}: {e}")
+                        local_path = url # Fallback
                 local_urls.append(local_path)
             self.cloud_urls = local_urls
 
@@ -39,6 +49,8 @@ class MEFDataProcessor:
         conn = duckdb.connect()
         try:
             conn.execute("INSTALL httpfs; LOAD httpfs;")
+            # Añadir máxima resiliencia contra rate-limits por si usamos la nube directamente
+            conn.execute("SET http_keep_alive=false; SET http_retries=10; SET http_retry_wait_ms=1000;")
             
             cte = f"""
             WITH mef_data AS (
