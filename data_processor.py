@@ -526,15 +526,16 @@ class MEFDataProcessor:
         """
         Métrica Forense: Analiza la línea de vida completa de cada CUI en todos los años disponibles.
         """
+        # _execute_query ya inyecta "WITH mef_data AS (...)", por lo que aquí continuamos con una coma
         query = f"""
-        WITH base_agrupada AS (
+        , base_agrupada AS (
             SELECT 
                 PRODUCTO_PROYECTO AS CUI,
                 MAX(PRODUCTO_PROYECTO_NOMBRE) AS Proyecto,
                 ANO_EJE,
-                SUM(PIA) AS PIA,
-                SUM(PIM) AS PIM,
-                SUM(DEVENGADO) AS Devengado
+                SUM(MONTO_PIA) AS PIA,
+                SUM(MONTO_PIM) AS PIM,
+                SUM(MONTO_DEVENGADO) AS Devengado
             FROM {self._get_table_str()}
             {where_clause_sin_anio} AND PRODUCTO_PROYECTO != '3999999'
             GROUP BY PRODUCTO_PROYECTO, ANO_EJE
