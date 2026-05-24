@@ -35,9 +35,9 @@ st.markdown("""
 # ----------------- MAIN HEADER -------------------------------
 col_logo, col_title = st.columns([1, 8])
 with col_logo:
-    if os.path.exists("logo_aynibrava.png"):
+    try:
         st.image("logo_aynibrava.png", use_container_width=True)
-    else:
+    except:
         st.markdown("<h1 style='text-align: right; font-size: 3em; margin: 0;'>👁️</h1>", unsafe_allow_html=True)
 with col_title:
     st.markdown("<h1 style='color: #1565c0; margin-bottom: 0; font-family: Arial, sans-serif; font-size: 2.5em;'>Visor MEF 360</h1>", unsafe_allow_html=True)
@@ -51,7 +51,7 @@ st.markdown("### 🔍 Filtros Globales (Selecciona tu Entidad a Fiscalizar)")
 # Helper function to format dropdowns
 where_clauses = []
 
-colF1, colF2, colF3, colF4 = st.columns(4)
+colF1, colF2, colF3 = st.columns(3)
 with colF1:
     anios_disponibles = processor.get_anios_disponibles()
     anio_seleccionado = st.selectbox("📅 Año Fiscal", anios_disponibles, index=0)
@@ -67,11 +67,25 @@ with colF3:
     sel_sector = st.selectbox("Sector", ["Todos"] + sectores, index=0)
     if sel_sector != "Todos":
         where_clauses.append(f"SECTOR_NOMBRE = '{sel_sector}'")
+
+colF4, colF5 = st.columns([1, 1])
 with colF4:
     pliegos = processor.get_filter_options("PLIEGO_NOMBRE", " AND ".join(where_clauses) if where_clauses else "")
-    sel_pliego = st.selectbox("Pliego / Municipalidad", ["Todos"] + pliegos, index=0)
+    sel_pliego = st.selectbox("Pliego / Entidad", ["Todos"] + pliegos, index=0)
     if sel_pliego != "Todos":
         where_clauses.append(f"PLIEGO_NOMBRE = '{sel_pliego}'")
+
+with colF5:
+    # Agregar el filtro de Unidad Ejecutora (SEC_EJEC)
+    current_where = "WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+    ejecs = processor.get_ejecutoras(current_where)
+    sel_ejecutora_str = st.selectbox("Unidad Ejecutora (SEC_EJEC)", ["Todos"] + ejecs, index=0)
+    sel_ejecutora = None
+    if sel_ejecutora_str != "Todos":
+        # Extraer solo el código (ej: '300456' de '300456 - MUNICIPALIDAD DE CHUMBIVILCAS')
+        sec_ejec = sel_ejecutora_str.split(' - ')[0]
+        where_clauses.append(f"SEC_EJEC = '{sec_ejec}'")
+        sel_ejecutora = sel_ejecutora_str.split(' - ')[1]
 
 # Construct final WHERE clauses
 final_where = "WHERE " + " AND ".join(where_clauses) if where_clauses else "WHERE 1=1"
@@ -93,9 +107,13 @@ modulo_seleccionado = st.sidebar.radio("", [
 st.sidebar.markdown("<hr>", unsafe_allow_html=True)
 st.sidebar.markdown("<div style='text-align:center; font-size:12px; color:gray; margin-bottom: 10px;'>📊 Datos extraídos en tiempo real de Consulta Amigable (Gasto Diario) del MEF.</div>", unsafe_allow_html=True)
 
-if os.path.exists("yape.png"):
-    st.sidebar.image("yape.png", use_container_width=True)
-    st.sidebar.markdown("<div style='text-align:center; background:#1a1a2e; color:white; padding:5px; border-radius:5px;'>Yape: <b>963 301 301</b><br><i>Apoya el mantenimiento del servidor</i></div>", unsafe_allow_html=True)
+with st.sidebar.expander("💖 Apoya el Proyecto (Yape)"):
+    st.markdown("<p style='font-size:13px; text-align:center;'>Tu donación voluntaria nos ayuda a mantener los servidores de AyniBrava encendidos.</p>", unsafe_allow_html=True)
+    try:
+        st.image("yape.png", use_container_width=True)
+        st.markdown("<div style='text-align:center; background:#1a1a2e; color:white; padding:5px; border-radius:5px;'>Yape: <b>963 301 301</b></div>", unsafe_allow_html=True)
+    except:
+        st.info("Sube tu archivo yape.png para que aparezca aquí.")
 
 st.sidebar.markdown("<br><div style='text-align:center; font-size:12px;'>Desarrollado en <b>Chumbivilcas</b> por <b>AyniBrava</b></div>", unsafe_allow_html=True)
 st.sidebar.markdown("<div style='text-align:center; font-size:12px; margin-top: 5px;'><a href='#' style='color:#1565c0; text-decoration: none;'>🚨 ¿Sugerencias o errores? Contáctanos</a></div>", unsafe_allow_html=True)
@@ -108,7 +126,17 @@ def format_millones(valor):
 # ----------------- MODULO 1: LUPA CIUDADANA -----------------
 if modulo_seleccionado == "🏢 1. Lupa Ciudadana (Obras)":
     st.markdown("<h2 style='color: #1565c0;'>🏢 Lupa Ciudadana: Fiscalización Directa</h2>", unsafe_allow_html=True)
-    st.info("💡 **Objetivo:** Descubre rápidamente si las obras de tu municipalidad o entidad están paralizadas o sufren de sobrecostos inflados. Busca obras sospechosas aquí.")
+    
+    with st.expander("📚 Glosario Ciudadano: Aprende a leer estos datos (Clic aquí)"):
+        st.markdown("""
+        **¿No entiendes los términos técnicos? Aquí te lo explicamos sencillo pero sin perder rigor:**
+        - **PIA (Presupuesto Inicial de Apertura):** Es la cantidad de dinero con la que la obra *inició* el año (01 de enero).
+        - **PIM (Presupuesto Institucional Modificado):** Es la cantidad de dinero *actualizada*. Si el PIM es mucho mayor que el PIA, significa que la obra ha sufrido inyecciones de dinero extra (posibles adendas, ampliaciones o sobrecostos).
+        - **Devengado (Gasto Real):** Es el dinero que *ya se pagó* al contratista porque demostró que avanzó la obra. Es el indicador oficial para medir si la obra avanza o está paralizada.
+        - **Salto Presupuestal / Adendas:** Es la diferencia matemática (PIM menos PIA). Mide cuánto dinero "extra" se le tuvo que inyectar al proyecto respecto a lo que se planeó al inicio del año.
+        """)
+    
+    st.info("💡 **Objetivo de este módulo:** Descubre rápidamente si las obras de tu municipalidad o entidad están paralizadas (bajo avance real) o sufren de sobrecostos inflados (salto presupuestal alto).")
     
     entidad_mostrar = sel_pliego if sel_pliego != "Todos" else (sel_sector if sel_sector != "Todos" else "Nivel Nacional")
     
