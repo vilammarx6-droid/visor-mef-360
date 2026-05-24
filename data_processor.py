@@ -9,38 +9,18 @@ class MEFDataProcessor:
         self.parquet_path = parquet_path
         
         # Detector Automático de Entorno Nube (Streamlit Cloud)
-        # Si la ruta de Windows (C:\) no existe, sabemos con 100% de seguridad que estamos en el servidor Linux de Streamlit.
-        self.is_cloud = not os.path.exists(self.csv_path) and not os.path.exists(self.parquet_path)
+        self.is_cloud = os.environ.get('STREAMLIT_RUNTIME_ENV') is not None
         
-        self.cloud_urls_raw = [
+        # Enlaces de la Nube (Hugging Face Datasets) - ¡AQUÍ ACTUALIZAS LOS AÑOS!
+        self.cloud_urls = [
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2026-Gasto-Diario.parquet",
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2025-Gasto-Diario.parquet",
-            "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2024-Gasto-Diario.parquet",
-            "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2023-Gasto-Diario.parquet"
+            "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2024-Gasto-Diario.parquet"
         ]
-        self.cloud_urls = []
 
-        if self.is_cloud:
-            self._ensure_cloud_data()
-        else:
+        # Solo buscar/crear archivos locales si NO estamos en la nube
+        if not self.is_cloud:
             self._ensure_parquet()
-
-    def _ensure_cloud_data(self):
-        import urllib.request
-        for url in self.cloud_urls_raw:
-            filename = url.split('/')[-1]
-            # Usar el directorio de trabajo temporal /tmp en Linux
-            local_path = os.path.join('/tmp', filename)
-            self.cloud_urls.append(local_path)
-            
-            if not os.path.exists(local_path):
-                with st.spinner(f"Descargando datos desde la nube: {filename} ... (Esto solo ocurre la primera vez que enciendes el servidor)"):
-                    try:
-                        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                        with urllib.request.urlopen(req) as response, open(local_path, 'wb') as out_file:
-                            out_file.write(response.read())
-                    except Exception as e:
-                        st.error(f"Error descargando {filename}: {e}")
 
     def _ensure_parquet(self):
         """Converts the CSV to a Parquet file if it doesn't exist for massive speedup."""
@@ -62,7 +42,7 @@ class MEFDataProcessor:
         conn = duckdb.connect()
         try:
             if self.is_cloud:
-                # Ya no necesitamos httpfs, leemos de los archivos descargados en /tmp
+                conn.execute("INSTALL httpfs; LOAD httpfs;")
                 urls_str = ", ".join([f"'{url}'" for url in self.cloud_urls])
                 data_source = f"read_parquet([{urls_str}])"
             else:
@@ -557,5 +537,47 @@ class MEFDataProcessor:
         FROM '{self.parquet_path}'
         {base_where}
         GROUP BY RUBRO_NOMBRE, FUNCION_NOMBRE
+        """
+        return self._execute_query(query)
+
+    def get_auditoria_historica_proyectos(self, where_clause_sin_anio):
+        """
+        Métrica Forense: Analiza la línea de vida completa de cada CUI en todos los años disponibles.
+        """
+        query = f"""
+        WITH base_agrupada AS (
+            SELECT 
+                PRODUCTO_PROYECTO AS CUI,
+                MAX(PRODUCTO_PROYECTO_NOMBRE) AS Proyecto,
+                ANO_EJE,
+                SUM(PIA) AS PIA,
+                SUM(PIM) AS PIM,
+                SUM(DEVENGADO) AS Devengado
+            FROM {self._get_table_str()}
+            {where_clause_sin_anio} AND PRODUCTO_PROYECTO != '3999999'
+            GROUP BY PRODUCTO_PROYECTO, ANO_EJE
+        ),
+        resumen AS (
+            SELECT 
+                CUI,
+                MAX(Proyecto) AS Proyecto,
+                MIN(ANO_EJE) AS anio_nacimiento,
+                MAX(ANO_EJE) AS anio_cierre,
+                SUM(Devengado) AS devengado_total
+            FROM base_agrupada
+            GROUP BY CUI
+        )
+        SELECT 
+            r.CUI,
+            r.Proyecto,
+            r.anio_nacimiento,
+            r.anio_cierre,
+            r.devengado_total,
+            b_nac.PIA AS pia_nacimiento,
+            b_cierre.PIM AS pim_cierre
+        FROM resumen r
+        LEFT JOIN base_agrupada b_nac ON r.CUI = b_nac.CUI AND r.anio_nacimiento = b_nac.ANO_EJE
+        LEFT JOIN base_agrupada b_cierre ON r.CUI = b_cierre.CUI AND r.anio_cierre = b_cierre.ANO_EJE
+        ORDER BY pim_cierre DESC
         """
         return self._execute_query(query)
