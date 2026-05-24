@@ -207,68 +207,50 @@ with tab1:
         fig.update_layout(title="Curva de Velocidad de Gasto Mensual", xaxis_title="Mes (1 = Ene, 12 = Dic)", yaxis_title="Monto (Soles)", template="plotly_white", margin=dict(t=50, l=0, r=0, b=0))
         st.plotly_chart(fig, use_container_width=True)
 
-# TAB 2: FISCALIZACIÓN DE OBRAS (HISTORIAL COMPLETO)
+# TAB 2: FISCALIZACIÓN DE OBRAS
 with tab2:
     st.markdown("""
     <div class='tech-box'>
-        <b>Auditoría Forense Avanzada: Historial Completo de Obras (Activas y Cerradas)</b><br>
-        Esta tabla no solo muestra las obras de este año. La IA ha viajado en el tiempo a través de toda la base de datos para construir la <b>Línea de Vida</b> de cada código CUI en esta entidad.<br><br>
-        <b>¿Cómo interpretar esto?</b><br>
-        - 🟢 <b>Activa</b>: Sigue recibiendo presupuesto este año.<br>
-        - 🔴 <b>Cerrada</b>: Ya no figura en el presupuesto de este año (obra terminada o abandonada en el pasado).<br>
-        - <b>Sobrecosto Histórico</b> (Columna Roja): Es la diferencia entre con cuánto dinero nació la obra originalmente, y cuánto terminó costando. ¡Detecta adendas ocultas de gestiones pasadas!
+        <b>Didáctica Ciudadana: Diferencia entre "Proyecto" y "Obra"</b><br>
+        En el Estado, un <i>Proyecto de Inversión</i> (identificado por un código CUI) es todo el paquete administrativo: incluye la idea, los planos (expediente técnico) y la construcción física. 
+        La <i>Obra</i> es solo la parte de los fierros y cemento. La tabla inferior lista todos los Proyectos de Inversión (Categoría Presupuestal 0004 o similares) para que vigiles su estado financiero.<br><br>
+        <b>¿Cómo detectar irregularidades en esta tabla?</b> Lee de izquierda a derecha. Si la columna <b>"Sobrecosto / Adendas"</b> (color rojo) tiene millones, significa que la obra cuesta mucho más de lo planeado inicialmente. Si el <b>"% Gasto Real"</b> (color verde) es casi 0%, la obra está abandonada.
     </div>
     """, unsafe_allow_html=True)
     
-    df_proy = processor.get_auditoria_historica_proyectos(final_where_sin_anio)
+    df_proy = processor.get_avance_proyectos(final_where)
     
     if not df_proy.empty:
-        # Lógica de Estado
-        if anio_seleccionado:
-            df_proy['Estado'] = df_proy['anio_cierre'].apply(lambda x: '🟢 ACTIVA' if str(x) == str(anio_seleccionado) else '🔴 CERRADA')
-        else:
-            df_proy['Estado'] = df_proy['anio_cierre'].apply(lambda x: '🟢 ACTIVA' if str(x) == "2026" else '🔴 CERRADA')
-            
-        df_proy['Sobrecosto'] = df_proy['pim_cierre'] - df_proy['pia_nacimiento']
-        df_proy['Ciclo_Vida'] = df_proy['anio_nacimiento'].astype(str) + " ➔ " + df_proy['anio_cierre'].astype(str)
+        df_proy['% Avance'] = (df_proy['Devengado'] / df_proy['PIM'] * 100).fillna(0)
+        df_proy['Salto_Presupuestal'] = df_proy['PIM'] - df_proy['PIA']
         
         c1, c2, c3 = st.columns(3)
-        total_activas = len(df_proy[df_proy['Estado'] == '🟢 ACTIVA'])
-        total_cerradas = len(df_proy[df_proy['Estado'] == '🔴 CERRADA'])
-        sobrecosto_total = df_proy['Sobrecosto'].sum()
-        
-        with c1: st.markdown(f"<div class='kpi-card'><div class='kpi-title'>Obras Activas Este Año</div><div class='kpi-value'>{total_activas}</div></div>", unsafe_allow_html=True)
-        with c2: st.markdown(f"<div class='kpi-card'><div class='kpi-title'>Obras Cerradas (Históricas)</div><div class='kpi-value'>{total_cerradas}</div></div>", unsafe_allow_html=True)
-        with c3: st.markdown(f"<div class='kpi-card' style='border-top-color: #c62828;'><div class='kpi-title'>Sobrecosto Histórico Total</div><div class='kpi-value' style='color:#c62828;'>S/ {sobrecosto_total/1000000:,.1f} M</div></div>", unsafe_allow_html=True)
+        with c1: st.markdown(f"<div class='kpi-card'><div class='kpi-title'>Proyectos Activos (CUI)</div><div class='kpi-value'>{len(df_proy)}</div></div>", unsafe_allow_html=True)
+        with c2: st.markdown(f"<div class='kpi-card'><div class='kpi-title'>Dinero en Proyectos (PIM)</div><div class='kpi-value'>S/ {df_proy['PIM'].sum()/1000000:,.1f} M</div></div>", unsafe_allow_html=True)
+        with c3: st.markdown(f"<div class='kpi-card' style='border-top-color: #c62828;'><div class='kpi-title'>Sobrecostos Totales Detectados</div><div class='kpi-value' style='color:#c62828;'>S/ {df_proy['Salto_Presupuestal'].sum()/1000000:,.1f} M</div></div>", unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
-        
-        filtro_estado = st.radio("Filtro Rápido:", ["Mostrar Todas", "Solo 🟢 ACTIVAS", "Solo 🔴 CERRADAS"], horizontal=True)
         busqueda = st.text_input("🔍 Filtrar tabla por nombre del proyecto o código CUI:", "")
-        
-        df_filtro = df_proy.copy()
-        if filtro_estado == "Solo 🟢 ACTIVAS": df_filtro = df_filtro[df_filtro['Estado'] == '🟢 ACTIVA']
-        elif filtro_estado == "Solo 🔴 CERRADAS": df_filtro = df_filtro[df_filtro['Estado'] == '🔴 CERRADA']
-        
         if busqueda:
-            df_filtro = df_filtro[df_filtro['Proyecto'].str.contains(busqueda, case=False) | df_filtro['CUI'].astype(str).str.contains(busqueda)]
+            df_proy = df_proy[df_proy['Proyecto'].str.contains(busqueda, case=False) | df_proy['CUI'].astype(str).str.contains(busqueda)]
             
-        df_mostrar = df_filtro[['Estado', 'CUI', 'Proyecto', 'Ciclo_Vida', 'pia_nacimiento', 'pim_cierre', 'Sobrecosto', 'devengado_total']].copy()
-        df_mostrar.columns = ['Estado', 'CUI', 'Nombre de la Obra', 'Años de Vida', 'Costo Original (PIA Nace)', 'Costo Final (PIM Cierra)', 'Sobrecosto Histórico', 'Plata Pagada (Gasto Total)']
+        df_mostrar = df_proy[['CUI', 'Proyecto', '% Avance', 'PIA', 'PIM', 'Salto_Presupuestal']].copy()
+        df_mostrar.columns = ['CUI', 'Nombre del Proyecto de Inversión', '% Gasto Real', 'Costo Inicial Planeado (PIA)', 'Costo Inflado (PIM)', 'Sobrecosto / Adendas']
         
         st.dataframe(
             df_mostrar.style
-            .background_gradient(subset=['Sobrecosto Histórico'], cmap='Reds', vmin=0)
+            .background_gradient(subset=['% Gasto Real'], cmap='RdYlGn', vmin=0, vmax=100)
+            .background_gradient(subset=['Sobrecosto / Adendas'], cmap='Reds', vmin=0)
             .format({
-                'Costo Original (PIA Nace)': 'S/ {:,.0f}',
-                'Costo Final (PIM Cierra)': 'S/ {:,.0f}',
-                'Sobrecosto Histórico': 'S/ {:,.0f}',
-                'Plata Pagada (Gasto Total)': 'S/ {:,.0f}'
+                '% Gasto Real': '{:.1f}%',
+                'Costo Inicial Planeado (PIA)': 'S/ {:,.0f}',
+                'Costo Inflado (PIM)': 'S/ {:,.0f}',
+                'Sobrecosto / Adendas': 'S/ {:,.0f}'
             }),
-            use_container_width=True, height=600, hide_index=True
+            use_container_width=True, height=500, hide_index=True
         )
     else:
-        st.warning("No se encontraron proyectos de inversión para esta entidad en la base de datos histórica.")
+        st.warning("No se encontraron proyectos de inversión para esta entidad en este año.")
 
 # TAB 3: AUDITORÍA TÉCNICA
 with tab3:
