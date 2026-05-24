@@ -4,50 +4,23 @@ import pandas as pd
 import streamlit as st
 
 class MEFDataProcessor:
-    def __init__(self, csv_path, parquet_path):
-        self.csv_path = csv_path
-        self.parquet_path = parquet_path
-        
-        # Detector Automático de Entorno Nube (Streamlit Cloud)
-        self.is_cloud = os.environ.get('STREAMLIT_RUNTIME_ENV') is not None
-        
-        # Enlaces de la Nube (Hugging Face Datasets) - ¡AQUÍ ACTUALIZAS LOS AÑOS!
+    def __init__(self, csv_path=None, parquet_path=None):
         self.cloud_urls = [
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2026-Gasto-Diario.parquet",
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2025-Gasto-Diario.parquet",
-            "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2024-Gasto-Diario.parquet"
+            "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2024-Gasto-Diario.parquet",
+            "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2023-Gasto-Diario.parquet"
         ]
 
-        # Solo buscar/crear archivos locales si NO estamos en la nube
-        if not self.is_cloud:
-            self._ensure_parquet()
-
-    def _ensure_parquet(self):
-        """Converts the CSV to a Parquet file if it doesn't exist for massive speedup."""
-        import glob
-        if not glob.glob(self.parquet_path):
-            st.warning("Convirtiendo archivo CSV (4.4GB) a formato Parquet para máxima velocidad. Esto tomará un par de minutos, por favor espera...", icon="⏳")
-            conn = duckdb.connect()
-            # We ignore errors to skip corrupted lines if any
-            query = f"""
-            COPY (
-                SELECT * FROM read_csv_auto('{self.csv_path}', ignore_errors=true)
-            ) TO '{self.parquet_path}' (FORMAT PARQUET);
-            """
-            conn.execute(query)
-            conn.close()
-            st.success("¡Conversión a Parquet completada! El dashboard ahora será ultra rápido.", icon="🚀")
+    def _get_table_str(self):
+        urls_str = ", ".join([f"'{url}'" for url in self.cloud_urls])
+        return f"read_parquet([{urls_str}])"
 
     def _execute_query(self, query):
         conn = duckdb.connect()
         try:
-            if self.is_cloud:
-                conn.execute("INSTALL httpfs; LOAD httpfs;")
-                urls_str = ", ".join([f"'{url}'" for url in self.cloud_urls])
-                data_source = f"read_parquet([{urls_str}])"
-            else:
-                data_source = f"'{self.parquet_path}'"
-
+            conn.execute("INSTALL httpfs; LOAD httpfs;")
+            
             cte = f"""
             WITH mef_data AS (
                 SELECT 
@@ -62,10 +35,17 @@ class MEFDataProcessor:
                         TRY_CAST(CATEGORIA_GASTO AS INTEGER) AS CATEGORIA_GASTO,
                         TRY_CAST(MES_EJE AS INTEGER) AS MES_EJE
                     )
-                FROM {data_source}
+                FROM {self._get_table_str()}
             )
             """
-            safe_query = cte + query.replace(f"'{self.parquet_path}'", "mef_data")
+            
+            # Las queries nuevas usan {self._get_table_str()}, las viejas usan '{self.parquet_path}'
+            # Forzamos a que todas usen 'mef_data'
+            safe_query = query.replace(f"'{self.parquet_path}'", "mef_data")
+            safe_query = safe_query.replace(self._get_table_str(), "mef_data")
+            
+            safe_query = cte + safe_query
+            
             return conn.execute(safe_query).df()
         finally:
             conn.close()
