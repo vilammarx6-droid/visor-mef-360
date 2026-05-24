@@ -46,40 +46,29 @@ class MEFDataProcessor:
         return f"read_parquet([{urls_str}])"
 
     def _execute_query(self, query):
-        conn = duckdb.connect()
-        try:
-            conn.execute("INSTALL httpfs; LOAD httpfs;")
-            # Añadir máxima resiliencia contra rate-limits por si usamos la nube directamente
-            conn.execute("SET http_keep_alive=false; SET http_retries=10; SET http_retry_wait_ms=1000;")
-            
-            cte = f"""
-            WITH mef_data AS (
-                SELECT 
-                    * REPLACE (
-                        TRY_CAST(MONTO_PIA AS DOUBLE) AS MONTO_PIA,
-                        TRY_CAST(MONTO_PIM AS DOUBLE) AS MONTO_PIM,
-                        TRY_CAST(MONTO_CERTIFICADO AS DOUBLE) AS MONTO_CERTIFICADO,
-                        TRY_CAST(MONTO_COMPROMETIDO_ANUAL AS DOUBLE) AS MONTO_COMPROMETIDO_ANUAL,
-                        TRY_CAST(MONTO_COMPROMETIDO AS DOUBLE) AS MONTO_COMPROMETIDO,
-                        TRY_CAST(MONTO_DEVENGADO AS DOUBLE) AS MONTO_DEVENGADO,
-                        TRY_CAST(MONTO_GIRADO AS DOUBLE) AS MONTO_GIRADO,
-                        TRY_CAST(CATEGORIA_GASTO AS INTEGER) AS CATEGORIA_GASTO,
-                        TRY_CAST(MES_EJE AS INTEGER) AS MES_EJE
-                    )
-                FROM {self._get_table_str()}
-            )
-            """
-            
-            # Las queries nuevas usan {self._get_table_str()}, las viejas usan '{self.parquet_path}'
-            # Forzamos a que todas usen 'mef_data'
-            safe_query = query.replace(f"'{self.parquet_path}'", "mef_data")
-            safe_query = safe_query.replace(self._get_table_str(), "mef_data")
-            
-            safe_query = cte + safe_query
-            
-            return conn.execute(safe_query).df()
-        finally:
-            conn.close()
+        cte = f"""
+        WITH mef_data AS (
+            SELECT 
+                * REPLACE (
+                    TRY_CAST(MONTO_PIA AS DOUBLE) AS MONTO_PIA,
+                    TRY_CAST(MONTO_PIM AS DOUBLE) AS MONTO_PIM,
+                    TRY_CAST(MONTO_CERTIFICADO AS DOUBLE) AS MONTO_CERTIFICADO,
+                    TRY_CAST(MONTO_COMPROMETIDO_ANUAL AS DOUBLE) AS MONTO_COMPROMETIDO_ANUAL,
+                    TRY_CAST(MONTO_COMPROMETIDO AS DOUBLE) AS MONTO_COMPROMETIDO,
+                    TRY_CAST(MONTO_DEVENGADO AS DOUBLE) AS MONTO_DEVENGADO,
+                    TRY_CAST(MONTO_GIRADO AS DOUBLE) AS MONTO_GIRADO,
+                    TRY_CAST(CATEGORIA_GASTO AS INTEGER) AS CATEGORIA_GASTO,
+                    TRY_CAST(MES_EJE AS INTEGER) AS MES_EJE
+                )
+            FROM {self._get_table_str()}
+        )
+        """
+        
+        safe_query = query.replace(f"'{self.parquet_path}'", "mef_data")
+        safe_query = safe_query.replace(self._get_table_str(), "mef_data")
+        safe_query = cte + safe_query
+        
+        return _cached_duckdb_query(safe_query)
 
     def get_filter_options(self, column_name, filter_conditions=""):
         """Gets unique values for a column to populate dropdowns."""
