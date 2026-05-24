@@ -5,6 +5,8 @@ import streamlit as st
 
 class MEFDataProcessor:
     def __init__(self, csv_path=None, parquet_path=None):
+        # Placeholder para evitar AttributeError en las f-strings antiguas
+        self.parquet_path = "mef_data"
         self.cloud_urls = [
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2026-Gasto-Diario.parquet",
             "https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/2025-Gasto-Diario.parquet",
