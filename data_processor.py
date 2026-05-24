@@ -527,6 +527,7 @@ class MEFDataProcessor:
         Métrica Forense: Analiza la línea de vida completa de cada CUI en todos los años disponibles.
         """
         # _execute_query ya inyecta "WITH mef_data AS (...)", por lo que aquí continuamos con una coma
+        # Usamos arg_min y arg_max para hacer un solo pase por la base de datos y evitar _duckdb.HTTPException
         query = f"""
         , base_agrupada AS (
             SELECT 
@@ -539,28 +540,17 @@ class MEFDataProcessor:
             FROM {self._get_table_str()}
             {where_clause_sin_anio} AND PRODUCTO_PROYECTO != '3999999'
             GROUP BY PRODUCTO_PROYECTO, ANO_EJE
-        ),
-        resumen AS (
-            SELECT 
-                CUI,
-                MAX(Proyecto) AS Proyecto,
-                MIN(ANO_EJE) AS anio_nacimiento,
-                MAX(ANO_EJE) AS anio_cierre,
-                SUM(Devengado) AS devengado_total
-            FROM base_agrupada
-            GROUP BY CUI
         )
         SELECT 
-            r.CUI,
-            r.Proyecto,
-            r.anio_nacimiento,
-            r.anio_cierre,
-            r.devengado_total,
-            b_nac.PIA AS pia_nacimiento,
-            b_cierre.PIM AS pim_cierre
-        FROM resumen r
-        LEFT JOIN base_agrupada b_nac ON r.CUI = b_nac.CUI AND r.anio_nacimiento = b_nac.ANO_EJE
-        LEFT JOIN base_agrupada b_cierre ON r.CUI = b_cierre.CUI AND r.anio_cierre = b_cierre.ANO_EJE
+            CUI,
+            MAX(Proyecto) AS Proyecto,
+            MIN(ANO_EJE) AS anio_nacimiento,
+            MAX(ANO_EJE) AS anio_cierre,
+            SUM(Devengado) AS devengado_total,
+            arg_min(PIA, ANO_EJE) AS pia_nacimiento,
+            arg_max(PIM, ANO_EJE) AS pim_cierre
+        FROM base_agrupada
+        GROUP BY CUI
         ORDER BY pim_cierre DESC
         """
         return self._execute_query(query)
