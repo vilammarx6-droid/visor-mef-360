@@ -240,12 +240,29 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Radiografía del Gasto", "⚖️ VERSUS:
 # ---------------------------------------------------------
 with tab1:
     st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
-    st.markdown(f'<div class="section-title">Radiografía General de la Entidad (Año {CURRENT_YEAR})</div>', unsafe_allow_html=True)
+    
+    col_yr1, col_yr2 = st.columns([1, 3])
+    with col_yr1:
+        tab1_year = st.selectbox("📅 Seleccione el Año Fiscal:", ["2026", "2025", "2024", "2023", "2022"], index=0, key="tab1_year_select")
+        
+    DYNAMIC_PARQUET = f"{tab1_year}-Gasto-Diario.parquet"
+    if not os.path.exists(DYNAMIC_PARQUET):
+        url = f"https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{DYNAMIC_PARQUET}"
+        with st.spinner(f"Descargando datos históricos de {tab1_year}..."):
+            response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'})
+            if response.status_code == 200:
+                with open(DYNAMIC_PARQUET, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192): f.write(chunk)
+            else:
+                st.error(f"⚠️ No hay datos disponibles para el año {tab1_year}.")
+                st.stop()
+
+    st.markdown(f'<div class="section-title">Radiografía General de la Entidad (Año {tab1_year})</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-subtitle">Descubre si tu autoridad gasta más en construir obras o en pagar planillas.</div>', unsafe_allow_html=True)
     st.info(f"""
     **🔍 Guía de Transparencia y Origen de Datos:**
     * **Fuente Oficial:** Portal de Datos Abiertos del MEF - [Presupuesto y Ejecución de Gasto (SIAF)](https://datosabiertos.mef.gob.pe/dataset/presupuesto-y-ejecucion-de-gasto).
-    * **Alcance Temporal:** Toda la información de esta pestaña corresponde **ÚNICAMENTE AL AÑO {CURRENT_YEAR}**. No incluye el historial pasado.
+    * **Alcance Temporal:** Toda la información de esta pestaña corresponde **ÚNICAMENTE AL AÑO {tab1_year}**. No incluye el historial pasado.
     * **Procesamiento de Datos:** El porcentaje de avance se calcula dividiendo la columna `MONTO_DEVENGADO` (dinero ya pagado) entre la columna `MONTO_PIM` (presupuesto asignado para este año).
     """)
     
@@ -258,7 +275,7 @@ with tab1:
             SUM(TRY_CAST(MONTO_COMPROMETIDO_ANUAL AS DOUBLE)) as Compromiso_Anual,
             SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado,
             SUM(TRY_CAST(MONTO_GIRADO AS DOUBLE)) as Girado
-        FROM '{PARQUET_FILE}' 
+        FROM '{DYNAMIC_PARQUET}' 
         WHERE {where_clause} 
     """
     df_macro = conn.execute(macro_query).df()
@@ -278,7 +295,7 @@ with tab1:
             COUNT(DISTINCT PRODUCTO_PROYECTO) as Count_Obras,
             SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM_Obras,
             SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Dev_Obras
-        FROM '{PARQUET_FILE}' 
+        FROM '{DYNAMIC_PARQUET}' 
         WHERE {where_clause} 
         AND CATEGORIA_GASTO = 6
         AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
@@ -333,7 +350,7 @@ with tab1:
                 SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
                 SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado,
                 CASE WHEN SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) > 0 THEN (SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) / SUM(TRY_CAST(MONTO_PIM AS DOUBLE))) * 100 ELSE 0 END as "% Avance"
-            FROM '{PARQUET_FILE}'
+            FROM '{DYNAMIC_PARQUET}'
             WHERE {{where_clause}} AND RUBRO_NOMBRE IS NOT NULL
             GROUP BY RUBRO_NOMBRE
             ORDER BY PIM ASC
@@ -355,7 +372,7 @@ with tab1:
                 SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
                 SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado,
                 CASE WHEN SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) > 0 THEN (SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) / SUM(TRY_CAST(MONTO_PIM AS DOUBLE))) * 100 ELSE 0 END as "% Avance"
-            FROM '{PARQUET_FILE}'
+            FROM '{DYNAMIC_PARQUET}'
             WHERE {{where_clause}} AND FUNCION_NOMBRE IS NOT NULL
             GROUP BY FUNCION_NOMBRE
             ORDER BY PIM ASC
@@ -373,7 +390,7 @@ with tab1:
     
     curva_query = f"""
         SELECT CAST(MES_EJE AS INTEGER) as Mes_Num, SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado
-        FROM '{PARQUET_FILE}' WHERE {where_clause} AND MES_EJE IS NOT NULL
+        FROM '{DYNAMIC_PARQUET}' WHERE {where_clause} AND MES_EJE IS NOT NULL
         GROUP BY MES_EJE ORDER BY Mes_Num
     """
     df_curva = conn.execute(curva_query).df()
