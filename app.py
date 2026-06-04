@@ -249,47 +249,76 @@ with tab1:
     * **Procesamiento de Datos:** El porcentaje de avance se calcula dividiendo la columna `MONTO_DEVENGADO` (dinero ya pagado) entre la columna `MONTO_PIM` (presupuesto asignado para este año).
     """)
     
-    # KPIs Básicos
+    # 1. KPIs Nivel Institucional (Total)
     macro_query = f"""
         SELECT 
+            SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as PIA,
             SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
-            SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado
+            SUM(TRY_CAST(MONTO_CERTIFICADO AS DOUBLE)) as Certificado,
+            SUM(TRY_CAST(MONTO_COMPROMETIDO_ANUAL AS DOUBLE)) as Compromiso_Anual,
+            SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado,
+            SUM(TRY_CAST(MONTO_GIRADO AS DOUBLE)) as Girado
+        FROM '{PARQUET_FILE}' 
+        WHERE {where_clause} 
+    """
+    df_macro = conn.execute(macro_query).df()
+    pia, pim, cert, comp, dev, gir, avance = 0, 0, 0, 0, 0, 0, 0
+    if not df_macro.empty and pd.notna(df_macro.iloc[0]['PIM']):
+        pia = df_macro.iloc[0]['PIA']
+        pim = df_macro.iloc[0]['PIM']
+        cert = df_macro.iloc[0]['Certificado']
+        comp = df_macro.iloc[0]['Compromiso_Anual']
+        dev = df_macro.iloc[0]['Devengado']
+        gir = df_macro.iloc[0]['Girado']
+        if pd.notna(dev) and pim > 0: avance = (dev / pim) * 100
+
+    # 2. KPIs Nivel Obras (Exclusivo Inversión Física)
+    obras_query = f"""
+        SELECT 
+            COUNT(DISTINCT PRODUCTO_PROYECTO) as Count_Obras,
+            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM_Obras,
+            SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Dev_Obras
         FROM '{PARQUET_FILE}' 
         WHERE {where_clause} 
         AND CATEGORIA_GASTO = 6
         AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
     """
-    df_macro = conn.execute(macro_query).df()
-    pim, dev, avance = 0, 0, 0
-    if not df_macro.empty and pd.notna(df_macro.iloc[0]['PIM']):
-        pim = df_macro.iloc[0]['PIM']
-        dev = df_macro.iloc[0]['Devengado']
-        if pd.notna(dev) and pim > 0:
-            avance = (dev / pim) * 100
-        else:
-            dev = 0
-            avance = 0
-
-    obras_count = 0
-    try:
-        count_query = f"SELECT COUNT(DISTINCT PRODUCTO_PROYECTO) FROM '{PARQUET_FILE}' WHERE {where_clause} AND CATEGORIA_GASTO = 6"
-        obras_count = conn.execute(count_query).fetchone()[0]
-    except Exception as e:
-        pass
+    df_obras = conn.execute(obras_query).df()
+    obras_count, pim_obras, dev_obras, avance_obras = 0, 0, 0, 0
+    if not df_obras.empty and pd.notna(df_obras.iloc[0]['Count_Obras']):
+        obras_count = df_obras.iloc[0]['Count_Obras']
+        pim_obras = df_obras.iloc[0]['PIM_Obras']
+        dev_obras = df_obras.iloc[0]['Dev_Obras']
+        if pd.notna(dev_obras) and pim_obras > 0: avance_obras = (dev_obras / pim_obras) * 100
 
     def format_money(monto):
-        if monto >= 1e9:
-            return f"S/ {monto/1e9:,.1f} Mil Millones"
-        elif monto >= 1e6:
-            return f"S/ {monto/1e6:,.1f} Millones"
-        else:
-            return f"S/ {monto:,.0f}"
+        if pd.isna(monto): return "S/ 0"
+        if monto >= 1e9: return f"S/ {monto/1e9:,.1f} Mil Millones"
+        elif monto >= 1e6: return f"S/ {monto/1e6:,.1f} Millones"
+        else: return f"S/ {monto:,.0f}"
 
+    # Renderizado UI Nivel 1
+    st.markdown('<h4 style="font-size: 16px; color: #334155; margin-bottom: 10px;">🏛️ Presupuesto Institucional Total (Incluye Planillas, Deudas y Administrativos)</h4>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #8b5cf6;"><div class="kpi-title">Obras Activas (Total)</div><div class="kpi-value">{obras_count:,.0f}</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #3b82f6;"><div class="kpi-title">Presupuesto Total (PIM)</div><div class="kpi-value">{format_money(pim)}</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #10b981;"><div class="kpi-title">Dinero Gastado Real</div><div class="kpi-value">{format_money(dev)}</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #f59e0b;"><div class="kpi-title">Porcentaje de Ejecución</div><div class="kpi-value">{avance:.1f}%</div></div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #94a3b8;"><div class="kpi-title">PIA</div><div class="kpi-value">{format_money(pia)}</div></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #3b82f6;"><div class="kpi-title">PIM</div><div class="kpi-value">{format_money(pim)}</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #8b5cf6;"><div class="kpi-title">Certificación</div><div class="kpi-value">{format_money(cert)}</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #ec4899;"><div class="kpi-title">Compromiso Anual</div><div class="kpi-value">{format_money(comp)}</div></div>', unsafe_allow_html=True)
+    st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+    c5, c6, c7, c8 = st.columns(4)
+    with c5: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #10b981;"><div class="kpi-title">Devengado</div><div class="kpi-value">{format_money(dev)}</div></div>', unsafe_allow_html=True)
+    with c6: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #14b8a6;"><div class="kpi-title">Girado</div><div class="kpi-value">{format_money(gir)}</div></div>', unsafe_allow_html=True)
+    with c7: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #f59e0b;"><div class="kpi-title">Avance %</div><div class="kpi-value">{avance:.1f}%</div></div>', unsafe_allow_html=True)
+    
+    st.markdown('<br>', unsafe_allow_html=True)
+    
+    # Renderizado UI Nivel 2
+    st.markdown('<h4 style="font-size: 16px; color: #334155; margin-bottom: 10px;">🏗️ Presupuesto Exclusivo para Obras de Inversión (Fierro y Cemento)</h4>', unsafe_allow_html=True)
+    c4, c5, c6, c7 = st.columns(4)
+    with c4: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #8b5cf6;"><div class="kpi-title">Obras Activas (Total)</div><div class="kpi-value">{obras_count:,.0f}</div></div>', unsafe_allow_html=True)
+    with c5: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #3b82f6;"><div class="kpi-title">PIM solo en Obras</div><div class="kpi-value">{format_money(pim_obras)}</div></div>', unsafe_allow_html=True)
+    with c6: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #10b981;"><div class="kpi-title">Gasto solo en Obras</div><div class="kpi-value">{format_money(dev_obras)}</div></div>', unsafe_allow_html=True)
+    with c7: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #f59e0b;"><div class="kpi-title">Avance Financiero Obras</div><div class="kpi-value">{avance_obras:.1f}%</div></div>', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
     st.markdown('### 📊 Origen y Destino de los Fondos')
