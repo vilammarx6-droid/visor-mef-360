@@ -33,7 +33,7 @@ components.html(
 
 st.markdown("""
 <style>
-    #MainMenu {visibility: hidden;} header {visibility: hidden;} footer {visibility: hidden;}
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
     .stApp { background-color: #f8fafc; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     
     .top-banner {
@@ -184,8 +184,8 @@ if f_search:
 
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
 st.sidebar.markdown("""
-<a href="#" style="display: block; background-color: #1877F2; color: white; text-align: center; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">
-    📘 Síguenos en Facebook
+<a href="#" style="display: block; background-color: #7c3aed; color: white; text-align: center; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">
+    💜 Apoyar el Proyecto (Donar)
 </a>
 """, unsafe_allow_html=True)
 
