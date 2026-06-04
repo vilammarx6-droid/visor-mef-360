@@ -33,7 +33,9 @@ components.html(
 
 st.markdown("""
 <style>
-    #MainMenu {visibility: hidden;} header {visibility: hidden;} [data-testid="collapsedControl"] {visibility: visible;} footer {visibility: hidden;}
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
+    header {background-color: transparent !important;}
+    [data-testid="stToolbar"] {visibility: hidden !important;}
     .stApp { background-color: #f8fafc; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     
     .top-banner {
