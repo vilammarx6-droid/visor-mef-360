@@ -33,9 +33,7 @@ components.html(
 
 st.markdown("""
 <style>
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;}
-    header {background-color: transparent !important;}
-    [data-testid="stToolbar"] {visibility: hidden !important;}
+    footer {visibility: hidden;}
     .stApp { background-color: #f8fafc; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
     
     .top-banner {
