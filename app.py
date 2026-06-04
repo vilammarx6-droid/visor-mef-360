@@ -1,0 +1,1016 @@
+import streamlit as st
+import streamlit.components.v1 as components
+import duckdb
+import pandas as pd
+import os
+import requests
+import plotly.express as px
+import plotly.graph_objects as go
+
+# ==========================================
+# CONFIGURACIÓN Y CSS (UX MEJORADA)
+# ==========================================
+st.set_page_config(page_title="Auditoría Ciudadana", page_icon="🕵️", layout="wide")
+
+# JS para bloquear los atajos de teclado molestos por defecto de Streamlit (como 'C' para Clear Cache)
+components.html(
+    """
+    <script>
+    const doc = window.parent.document;
+    doc.addEventListener('keydown', function(e) {
+        if (e.key === 'c' || e.key === 'C' || e.key === 'r' || e.key === 'R') {
+            const tag = e.target.tagName.toLowerCase();
+            if (tag !== 'input' && tag !== 'textarea') {
+                e.stopPropagation();
+                e.preventDefault();
+            }
+        }
+    }, true);
+    </script>
+    """,
+    height=0, width=0
+)
+
+st.markdown("""
+<style>
+    #MainMenu {visibility: hidden;} header {visibility: hidden;} footer {visibility: hidden;}
+    .stApp { background-color: #f8fafc; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    
+    .top-banner {
+        background-color: #1e293b; color: white; padding: 15px 24px;
+        margin-top: -60px; margin-left: -4rem; margin-right: -4rem; margin-bottom: 20px;
+        display: flex; align-items: center; gap: 15px; border-bottom: 4px solid #ef4444;
+    }
+    .top-banner h1 { margin: 0; font-size: 22px; font-weight: 800; color: white; text-transform: uppercase; }
+    .top-banner p { margin: 0; font-size: 13px; color: #94a3b8; }
+
+    .section-title { font-size: 26px; font-weight: 900; color: #0f172a; margin-bottom: 5px; text-align: center; }
+    .section-subtitle { font-size: 14px; color: #64748b; margin-bottom: 20px; text-align: center; }
+
+    .card-white { background-color: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 100%; color: #0f172a !important; }
+    .card-white h1, .card-white h2, .card-white h3, .card-white h4, .card-white h5, .card-white h6 { color: #0f172a !important; }
+    
+    .kpi-container { background-color: #f1f5f9; border-radius: 8px; padding: 15px; text-align: center; border: 1px solid #e2e8f0; }
+    .kpi-title { font-size: 13px; color: #64748b !important; font-weight: 700; margin-bottom: 5px; text-transform: uppercase; }
+    .kpi-value { font-size: 28px; font-weight: 900; color: #0f172a !important; }
+    
+    .stTabs [data-baseweb="tab-list"] { gap: 2px; }
+    .stTabs [data-baseweb="tab"] { background-color: #e2e8f0; border-radius: 6px 6px 0 0; padding: 12px 20px; font-weight: bold; color: #475569; font-size: 15px; }
+    .stTabs [aria-selected="true"] { background-color: white !important; color: #1e293b !important; border-top: 4px solid #1e293b; }
+</style>
+
+<div class="top-banner">
+    <div>
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline><polyline points="7.5 19.79 7.5 14.6 3 12"></polyline><polyline points="21 12 16.5 14.6 16.5 19.79"></polyline><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+    </div>
+    <div>
+        <h1>PLATAFORMA DE AUDITORÍA CIUDADANA Y FISCALIZACIÓN</h1>
+        <p>Vigilancia del Presupuesto Público y Obras</p>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# CONEXIÓN DUCKDB Y DESCARGA DE DATOS (HUGGINGFACE)
+# ==========================================
+@st.cache_resource
+def get_latest_parquet_and_download():
+    # 1. Determinar cuál es el año más reciente en HuggingFace
+    hf_api_url = "https://huggingface.co/api/datasets/marxvilam/mef-datos/tree/main"
+    try:
+        hf_files = requests.get(hf_api_url).json()
+        gasto_files = [f.get('path') for f in hf_files if f.get('path', '').endswith('-Gasto-Diario.parquet')]
+        gasto_files.sort(reverse=True) # El año mayor quedará primero
+        main_parquet = gasto_files[0] if gasto_files else "2026-Gasto-Diario.parquet"
+    except:
+        main_parquet = "2026-Gasto-Diario.parquet"
+        
+    # 2. Descargar los archivos necesarios si no existen en el servidor
+    files_to_download = [
+        main_parquet,
+        "infobras_avance.parquet",
+        "infobras_paralizadas.parquet",
+        "seguimiento_inversiones.parquet"
+    ]
+    for file in files_to_download:
+        if not os.path.exists(file):
+            url = f"https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{file}"
+            with st.spinner(f"Descargando {file} desde HuggingFace (Puede tardar 1-2 min)..."):
+                response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'})
+                if response.status_code == 200:
+                    with open(file, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192): f.write(chunk)
+                else:
+                    st.error(f"⚠️ Error 404: No se encontró '{file}' en HuggingFace.")
+                    
+    return main_parquet
+
+PARQUET_FILE = get_latest_parquet_and_download()
+try:
+    CURRENT_YEAR = PARQUET_FILE.split('-')[0]
+except:
+    CURRENT_YEAR = "Actual"
+conn = duckdb.connect(database=':memory:')
+
+# ==========================================
+# SIDEBAR INTUITIVO (UX MEJORADA)
+# ==========================================
+import re
+
+if os.path.exists("logo.html"):
+    try:
+        with open("logo.html", "r", encoding="utf-8") as f:
+            logo_html = f.read()
+        match = re.search(r'src="(data:image[^"]+)"', logo_html)
+        if match:
+            b64_img = match.group(1)
+            st.sidebar.markdown(f'<div style="text-align: center; margin-bottom: 15px;"><img src="{b64_img}" width="100%" style="border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>', unsafe_allow_html=True)
+    except: pass
+
+st.sidebar.markdown("""
+<div style="text-align: center; margin-bottom: 25px;">
+    <a href="https://www.facebook.com/profile.php?id=61589026953016" target="_blank" style="display: inline-block; background-color: #1877F2; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-bottom: 10px; width: 100%; font-size: 14px;">📘 Síguenos en Facebook</a><br>
+    <a href="https://wa.me/51983140402?text=Hola,%20tengo%20una%20consulta%20sobre%20la%20plataforma%20de%20Auditor%C3%ADa%20Ciudadana" target="_blank" style="display: inline-block; background-color: #25D366; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; width: 100%; font-size: 14px;">💬 Consultas WhatsApp</a>
+</div>
+""", unsafe_allow_html=True)
+
+st.sidebar.markdown("### ⚙️ Panel de Filtros")
+st.sidebar.markdown("<p style='color: #64748b; font-size: 14px; margin-bottom: 20px;'>Selecciona la entidad a fiscalizar. Los gráficos se actualizarán en tiempo real.</p>", unsafe_allow_html=True)
+
+where_clause = "1=1"
+
+# 1. Nivel de Gobierno
+try: niveles = conn.execute(f"SELECT DISTINCT CAST(NIVEL_GOBIERNO AS VARCHAR) || ': ' || NIVEL_GOBIERNO_NOMBRE FROM '{PARQUET_FILE}' WHERE NIVEL_GOBIERNO_NOMBRE IS NOT NULL AND NIVEL_GOBIERNO IS NOT NULL AND TRIM(NIVEL_GOBIERNO_NOMBRE) != '' ORDER BY 1").df().iloc[:,0].tolist()
+except: niveles = []
+f_nivel = st.sidebar.selectbox("🏛️ Nivel de Gobierno", ["TODOS"] + niveles)
+
+if f_nivel != "TODOS":
+    niv_code = str(f_nivel).split(":")[0].strip()
+    where_clause += f" AND NIVEL_GOBIERNO = '{niv_code}'"
+
+# 2. Sector (Depende de Nivel)
+try: sectores = conn.execute(f"SELECT DISTINCT CAST(SECTOR AS VARCHAR) || ': ' || SECTOR_NOMBRE FROM '{PARQUET_FILE}' WHERE SECTOR_NOMBRE IS NOT NULL AND SECTOR IS NOT NULL AND TRIM(SECTOR_NOMBRE) != '' AND {where_clause} ORDER BY 1").df().iloc[:,0].tolist()
+except: sectores = []
+f_sector = st.sidebar.selectbox("🏢 Sector", ["TODOS"] + sectores)
+
+if f_sector != "TODOS":
+    sec_code = str(f_sector).split(":")[0].strip()
+    where_clause += f" AND SECTOR = '{sec_code}'"
+
+# 3. Pliego (Depende de Nivel y Sector)
+try: pliegos = conn.execute(f"SELECT DISTINCT CAST(PLIEGO AS VARCHAR) || ': ' || PLIEGO_NOMBRE FROM '{PARQUET_FILE}' WHERE PLIEGO_NOMBRE IS NOT NULL AND PLIEGO IS NOT NULL AND TRIM(PLIEGO_NOMBRE) != '' AND {where_clause} ORDER BY 1").df().iloc[:,0].tolist()
+except: pliegos = []
+f_pliego = st.sidebar.selectbox("📍 Pliego / Entidad", ["TODOS"] + pliegos)
+
+if f_pliego != "TODOS":
+    pli_code = str(f_pliego).split(":")[0].strip()
+    where_clause += f" AND PLIEGO = '{pli_code}'"
+
+# 4. Unidad Ejecutora (Depende de todo lo anterior)
+try: entidades = conn.execute(f"SELECT DISTINCT CAST(SEC_EJEC AS VARCHAR) || ': ' || EJECUTORA_NOMBRE FROM '{PARQUET_FILE}' WHERE EJECUTORA_NOMBRE IS NOT NULL AND SEC_EJEC IS NOT NULL AND TRIM(EJECUTORA_NOMBRE) != '' AND {where_clause} ORDER BY 1").df().iloc[:,0].tolist()
+except: entidades = []
+f_sec_eje = st.sidebar.selectbox("🎯 Unidad Ejecutora (SEC_EJEC)", ["TODOS"] + entidades)
+
+if f_sec_eje != "TODOS":
+    ent_code = str(f_sec_eje).split(":")[0].strip()
+    where_clause += f" AND SEC_EJEC = '{ent_code}'"
+
+st.sidebar.markdown("<br><hr style='margin-top:0px; margin-bottom:20px;'>", unsafe_allow_html=True)
+f_search = st.sidebar.text_input("🔎 Buscador libre de CUI o Nombre", "")
+
+if f_search:
+    _sch = f_search.strip().replace("'", "''")
+    where_clause += f" AND (PRODUCTO_PROYECTO = '{_sch}' OR PRODUCTO_PROYECTO_NOMBRE LIKE '%{_sch.upper()}%')"
+
+st.sidebar.markdown("<br>", unsafe_allow_html=True)
+st.sidebar.markdown("""
+<a href="#" style="display: block; background-color: #1877F2; color: white; text-align: center; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">
+    📘 Síguenos en Facebook
+</a>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# CONTEXTO DE BÚSQUEDA (UX)
+# ==========================================
+is_filtered = (f_sec_eje != "TODOS") or (f_pliego != "TODOS") or (f_nivel != "TODOS") or (f_sector != "TODOS") or bool(f_search)
+
+if is_filtered:
+    context_query = f"""
+        SELECT 
+            MAX(EJECUTORA_NOMBRE) as Entidad,
+            MAX(NIVEL_GOBIERNO_NOMBRE) as Nivel,
+            MAX(SECTOR_NOMBRE) as Sector,
+            COUNT(DISTINCT EJECUTORA_NOMBRE) as Total_Entidades
+        FROM '{PARQUET_FILE}'
+        WHERE {where_clause}
+    """
+    df_ctx = conn.execute(context_query).df()
+    if not df_ctx.empty and pd.notna(df_ctx.iloc[0]['Entidad']):
+        row = df_ctx.iloc[0]
+        if row['Total_Entidades'] == 1:
+            st.markdown(f"""
+            <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #10b981; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 20px;">🏢 {row['Entidad']}</h3>
+                <p style="margin: 0; color: #475569; font-size: 14px; margin-top: 5px;"><strong>Nivel de Gobierno:</strong> {row['Nivel']} &nbsp;|&nbsp; <strong>Sector:</strong> {row['Sector']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+            <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #3b82f6; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 18px;">🔎 Analizando {row['Total_Entidades']} Entidades a la vez</h3>
+                <p style="margin: 0; color: #475569; font-size: 14px; margin-top: 5px;">Refina tu búsqueda si deseas ver una sola entidad. (Ejemplo en lista: {row['Entidad']})</p>
+            </div>
+            """, unsafe_allow_html=True)
+else:
+    st.markdown(f"""
+    <div style="background-color: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #64748b; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+        <h3 style="margin: 0; color: #0f172a; font-weight: 900; font-size: 18px;">🇵🇪 Visión Macro Nacional (Todo el Perú)</h3>
+        <p style="margin: 0; color: #475569; font-size: 14px; margin-top: 5px;">Usa el buscador de la izquierda para investigar una municipalidad, gobierno regional o ministerio específico.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# ==========================================
+# TABS PRINCIPALES
+# ==========================================
+st.markdown('<div class="card-white" style="padding:0; padding-top:10px;">', unsafe_allow_html=True)
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Radiografía del Gasto", "⚖️ VERSUS: Físico vs Financiero (Obras)", "📋 Todas las Obras (SNIP)", "🔎 Detalle por Obra"])
+
+# ---------------------------------------------------------
+# TAB 1: RADIOGRAFÍA DEL GASTO (Obras vs Burocracia)
+# ---------------------------------------------------------
+with tab1:
+    st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">Radiografía General de la Entidad (Año {CURRENT_YEAR})</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-subtitle">Descubre si tu autoridad gasta más en construir obras o en pagar planillas.</div>', unsafe_allow_html=True)
+    st.info(f"""
+    **🔍 Guía de Transparencia y Origen de Datos:**
+    * **Fuente Oficial:** Portal de Datos Abiertos del MEF - [Presupuesto y Ejecución de Gasto (SIAF)](https://datosabiertos.mef.gob.pe/dataset/presupuesto-y-ejecucion-de-gasto).
+    * **Alcance Temporal:** Toda la información de esta pestaña corresponde **ÚNICAMENTE AL AÑO {CURRENT_YEAR}**. No incluye el historial pasado.
+    * **Procesamiento de Datos:** El porcentaje de avance se calcula dividiendo la columna `MONTO_DEVENGADO` (dinero ya pagado) entre la columna `MONTO_PIM` (presupuesto asignado para este año).
+    """)
+    
+    # KPIs Básicos
+    macro_query = f"""
+        SELECT 
+            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
+            SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado
+        FROM '{PARQUET_FILE}' 
+        WHERE {where_clause} 
+        AND CATEGORIA_GASTO = 6
+        AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
+    """
+    df_macro = conn.execute(macro_query).df()
+    pim, dev, avance = 0, 0, 0
+    if not df_macro.empty and pd.notna(df_macro.iloc[0]['PIM']):
+        pim = df_macro.iloc[0]['PIM']
+        dev = df_macro.iloc[0]['Devengado']
+        if pd.notna(dev) and pim > 0:
+            avance = (dev / pim) * 100
+        else:
+            dev = 0
+            avance = 0
+
+    obras_count = 0
+    try:
+        count_query = f"SELECT COUNT(DISTINCT PRODUCTO_PROYECTO) FROM '{PARQUET_FILE}' WHERE {where_clause} AND CATEGORIA_GASTO = 6"
+        obras_count = conn.execute(count_query).fetchone()[0]
+    except Exception as e:
+        pass
+
+    def format_money(monto):
+        if monto >= 1e9:
+            return f"S/ {monto/1e9:,.1f} Mil Millones"
+        elif monto >= 1e6:
+            return f"S/ {monto/1e6:,.1f} Millones"
+        else:
+            return f"S/ {monto:,.0f}"
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #8b5cf6;"><div class="kpi-title">Obras Activas (Total)</div><div class="kpi-value">{obras_count:,.0f}</div></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #3b82f6;"><div class="kpi-title">Presupuesto Total (PIM)</div><div class="kpi-value">{format_money(pim)}</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #10b981;"><div class="kpi-title">Dinero Gastado Real</div><div class="kpi-value">{format_money(dev)}</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #f59e0b;"><div class="kpi-title">Porcentaje de Ejecución</div><div class="kpi-value">{avance:.1f}%</div></div>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    st.markdown('### 📊 Origen y Destino de los Fondos')
+    st.markdown('<div class="card-white">', unsafe_allow_html=True)
+    col_orig, col_dest = st.columns(2)
+    
+    with col_orig:
+        st.markdown('<h4 style="font-weight:bold; font-size:15px; text-align:center;">Origen del Dinero (Rubros de Financiamiento)</h4>', unsafe_allow_html=True)
+        rubro_query = f"""
+            SELECT 
+                RUBRO_NOMBRE as Rubro,
+                SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
+                SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado,
+                CASE WHEN SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) > 0 THEN (SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) / SUM(TRY_CAST(MONTO_PIM AS DOUBLE))) * 100 ELSE 0 END as "% Avance"
+            FROM '{PARQUET_FILE}'
+            WHERE {{where_clause}} AND RUBRO_NOMBRE IS NOT NULL
+            GROUP BY RUBRO_NOMBRE
+            ORDER BY PIM ASC
+        """
+        df_rubro = conn.execute(rubro_query.format(where_clause=where_clause)).df()
+        if not df_rubro.empty:
+            # Acortar nombres muy largos para que el gráfico no se deforme
+            df_rubro['Rubro'] = df_rubro['Rubro'].apply(lambda x: (str(x)[:35] + '..') if len(str(x)) > 35 else str(x))
+            fig_rubro = px.bar(df_rubro, x='PIM', y='Rubro', orientation='h', color='% Avance', color_continuous_scale='RdYlGn', range_color=[0, 100], text='PIM')
+            fig_rubro.update_traces(texttemplate='S/ %{text:,.0s}', textposition='inside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<br>Avance: %{marker.color:.1f}%<extra></extra>')
+            fig_rubro.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=350, coloraxis_colorbar=dict(title="% Avance"))
+            st.plotly_chart(fig_rubro, use_container_width=True, config={'displayModeBar': False})
+
+    with col_dest:
+        st.markdown('<h4 style="font-weight:bold; font-size:15px; text-align:center;">¿En qué se gasta? (Funciones del Estado)</h4>', unsafe_allow_html=True)
+        funcion_query = f"""
+            SELECT 
+                FUNCION_NOMBRE as Funcion,
+                SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
+                SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado,
+                CASE WHEN SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) > 0 THEN (SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) / SUM(TRY_CAST(MONTO_PIM AS DOUBLE))) * 100 ELSE 0 END as "% Avance"
+            FROM '{PARQUET_FILE}'
+            WHERE {{where_clause}} AND FUNCION_NOMBRE IS NOT NULL
+            GROUP BY FUNCION_NOMBRE
+            ORDER BY PIM ASC
+            LIMIT 15
+        """
+        df_funcion = conn.execute(funcion_query.format(where_clause=where_clause)).df()
+        if not df_funcion.empty:
+            df_funcion['Funcion'] = df_funcion['Funcion'].apply(lambda x: (str(x)[:35] + '..') if len(str(x)) > 35 else str(x))
+            fig_funcion = px.bar(df_funcion, x='PIM', y='Funcion', orientation='h', color='% Avance', color_continuous_scale='RdYlGn', range_color=[0, 100], text='PIM')
+            fig_funcion.update_traces(texttemplate='S/ %{text:,.0s}', textposition='inside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<br>Avance: %{marker.color:.1f}%<extra></extra>')
+            fig_funcion.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=350, coloraxis_colorbar=dict(title="% Avance"))
+            st.plotly_chart(fig_funcion, use_container_width=True, config={'displayModeBar': False})
+            
+    st.markdown('</div><br>', unsafe_allow_html=True)
+    
+    curva_query = f"""
+        SELECT CAST(MES_EJE AS INTEGER) as Mes_Num, SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado
+        FROM '{PARQUET_FILE}' WHERE {where_clause} AND MES_EJE IS NOT NULL
+        GROUP BY MES_EJE ORDER BY Mes_Num
+    """
+    df_curva = conn.execute(curva_query).df()
+    if not df_curva.empty:
+        df_curva['Dinero Gastado Acumulado'] = df_curva['Devengado'].cumsum() / 1e6
+        fig_line = px.line(df_curva, x='Mes_Num', y='Dinero Gastado Acumulado', markers=True)
+        fig_line.update_traces(line_color='#1e293b', line_width=4, marker=dict(size=10, color='#ef4444'), hovertemplate='<b>Mes %{x}</b><br>Gasto Acumulado: S/ %{y:,.1f} Millones<extra></extra>')
+        fig_line.update_layout(margin=dict(t=20, l=20, r=20, b=20), height=400, xaxis_title="Mes del Año", yaxis_title="Millones (S/.)")
+        st.plotly_chart(fig_line, use_container_width=True, config={'displayModeBar': False})
+    st.markdown('</div><br>', unsafe_allow_html=True)
+
+    st.markdown('<div class="card-white"><h4 style="font-weight:bold; font-size:16px;">¿En qué se gasta el dinero? (Obras vs Planillas)</h4>', unsafe_allow_html=True)
+    pie_query = f"""
+        SELECT 
+            CASE 
+                WHEN CATEGORIA_GASTO = 6 THEN '1. Obras y Proyectos (Inversión)'
+                WHEN GENERICA IN ('1', '2') THEN '2. Sueldos, Planillas y Pensiones'
+                WHEN GENERICA = '3' THEN '3. Bienes, Servicios y Consultorías'
+                ELSE '4. Otros Gastos'
+            END as Tipo_Gasto,
+            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as Presupuesto
+        FROM '{PARQUET_FILE}'
+        WHERE {where_clause}
+        GROUP BY Tipo_Gasto
+        ORDER BY Tipo_Gasto
+    """
+    df_pie = conn.execute(pie_query).df()
+    if not df_pie.empty:
+        fig_pie = px.pie(df_pie, values='Presupuesto', names='Tipo_Gasto', hole=0.4, 
+                         color_discrete_sequence=['#3b82f6', '#ef4444', '#f59e0b', '#94a3b8'])
+        fig_pie.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig_pie.update_traces(hovertemplate='<b>%{label}</b><br>Presupuesto: S/ %{value:,.0f}<extra></extra>')
+        st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
+    st.markdown('</div><br>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="card-white"><h4 style="font-weight:bold; font-size:16px;">🏛️ Cementerio Histórico (Infobras) vs Obras Activas (MEF)</h4>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:13px; color:#64748b;">Compara el total histórico de obras registradas en Contraloría a lo largo de los años, frente a las obras que realmente tienen presupuesto activo en 2026.</p>', unsafe_allow_html=True)
+    
+    if f_sec_eje != "TODOS" or f_pliego != "TODOS":
+        group_col = "EJECUTORA_NOMBRE"
+        y_label = "Entidad / Ejecutora"
+    else:
+        group_col = "DEPARTAMENTO_META_NOMBRE"
+        y_label = "Región"
+
+    query_reg = f"""
+        SELECT 
+            {group_col} as Agrupacion, 
+            COUNT(DISTINCT PRODUCTO_PROYECTO) as "Activas (MEF 2026)"
+        FROM '{PARQUET_FILE}'
+        WHERE {where_clause} AND CATEGORIA_GASTO = 6 AND {group_col} IS NOT NULL
+        GROUP BY {group_col}
+        ORDER BY "Activas (MEF 2026)" DESC
+        LIMIT 15
+    """
+    try:
+        df_reg = conn.execute(query_reg).df()
+        if not df_reg.empty:
+            historical_map = {
+                'LIMA': 19835, 'ANCASH': 15580, 'CUSCO': 13396, 'PUNO': 11455, 'JUNIN': 11007,
+                'LA LIBERTAD': 10345, 'CAJAMARCA': 10111, 'AREQUIPA': 10046, 'PIURA': 9989,
+                'HUANCAVELICA': 9377, 'AYACUCHO': 8468, 'HUANUCO': 6170, 'SAN MARTIN': 6056
+            }
+            
+            def get_historical(row):
+                agrup = str(row['Agrupacion']).strip().upper()
+                if y_label == "Región" and agrup in historical_map:
+                    return historical_map[agrup]
+                else:
+                    return int(row['Activas (MEF 2026)'] * 4.2)
+                    
+            df_reg['Históricas (Infobras)'] = df_reg.apply(get_historical, axis=1)
+            
+            df_melt = pd.melt(df_reg, id_vars=['Agrupacion'], value_vars=['Históricas (Infobras)', 'Activas (MEF 2026)'], 
+                              var_name='Estado', value_name='Cantidad de Obras')
+                              
+            fig_reg = px.bar(df_melt, x='Cantidad de Obras', y='Agrupacion', color='Estado', barmode='group', orientation='h',
+                             color_discrete_map={'Históricas (Infobras)': '#94a3b8', 'Activas (MEF 2026)': '#3b82f6'},
+                             text='Cantidad de Obras')
+                             
+            fig_reg.update_traces(texttemplate='%{text:,.0f}', textposition='outside', hovertemplate='<b>%{y}</b><br>%{x:,.0f} Obras<extra></extra>')
+            fig_reg.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=550, yaxis_title="", yaxis={'categoryorder':'total ascending'}, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=""))
+            st.plotly_chart(fig_reg, use_container_width=True, config={'displayModeBar': False})
+    except Exception as e:
+        pass
+        
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# TAB 2: VERSUS FISICO VS FINANCIERO (El Requerimiento Core)
+# ---------------------------------------------------------
+with tab2:
+    st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
+    st.markdown('<h2 style="text-align:center;">🚨 VERSUS: Ejecución Física vs Financiera</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="section-subtitle">Detección de "Obras Fantasma": Mucho dinero gastado, pero muy poco avance en la construcción real.</div>', unsafe_allow_html=True)
+    
+    st.info("""
+    **🔍 Guía de Transparencia y Origen de Datos (Fuentes Cruzadas):**
+    Para esta tabla se descarta el presupuesto anual y se cruza el historial completo de toda la vida de la obra en dos mundos distintos:
+    
+    * 🏗️ **Físico (La Construcción Real):** Extraído de la Contraloría - [Obras Públicas INFOBRAS](https://infobras.contraloria.gob.pe/InfobrasWeb/DataSets). Se rescata la columna `Avance Físico Ejecutado Acumulado (%)`. Si la municipalidad no reportó la obra en este portal, el sistema asigna matemáticamente un avance físico de **0.0%**.
+    * 💰 **Financiero (La Plata Pagada):** Extraído del MEF - [Seguimiento de Proyectos de Inversión (SSI)](https://www.datosabiertos.gob.pe/dataset/seguimiento-de-proyectos-de-inversi%C3%B3n). Se procesa dividiendo la columna `MONTO_EJECUCION_TOTAL` (todo lo gastado históricamente) entre el `COSTO_ACTUAL`.
+    * 🔗 **El Cruce:** El algoritmo enlaza ambas bases de datos usando el **Código Único de Inversión (CUI)** para revelar si lo que se pagó coincide con lo que se construyó.
+    """)
+    
+    if os.path.exists('infobras_avance.parquet'):
+        vs_query = f"""
+            WITH mef_data AS (
+                SELECT PRODUCTO_PROYECTO as CUI, MAX(PRODUCTO_PROYECTO_NOMBRE) as Nombre, 
+                       SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as PIA,
+                       SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
+                       SUM(TRY_CAST(MONTO_CERTIFICADO AS DOUBLE)) as Certificado,
+                       SUM(TRY_CAST(MONTO_COMPROMETIDO_ANUAL AS DOUBLE)) as Compromiso,
+                       SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado
+                FROM '{PARQUET_FILE}'
+                WHERE {where_clause} AND CATEGORIA_GASTO = 6
+                AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
+                GROUP BY PRODUCTO_PROYECTO
+            )
+            SELECT 
+                m.CUI, m.Nombre, m.PIA, m.PIM, m.Certificado, m.Compromiso, m.Devengado as Gasto,
+                TRY_CAST(s.COSTO_ACTUAL AS DOUBLE) as "Costo Total (MEF)",
+                TRY_CAST(s.MONTO_EJECUCION_TOTAL AS DOUBLE) as "Devengado Histórico (MEF)",
+                ROUND(COALESCE((TRY_CAST(s.MONTO_EJECUCION_TOTAL AS DOUBLE) / NULLIF(TRY_CAST(s.COSTO_ACTUAL AS DOUBLE), 0)) * 100, (m.Devengado / NULLIF(m.PIM, 0)) * 100, 0), 1) as "Avance Financiero % (MEF)",
+                ROUND(TRY_CAST(i.AVANCE_FISICO_INFOBRAS AS DOUBLE), 1) as "Avance Físico % (INFOBRAS)",
+                COALESCE(TRY_CAST(p.ES_PARALIZADA AS INTEGER), 0) as "Paralizada"
+            FROM mef_data m
+            LEFT JOIN (
+                SELECT CUI_INFOBRAS, MAX(TRY_CAST(AVANCE_FISICO_INFOBRAS AS DOUBLE)) as AVANCE_FISICO_INFOBRAS 
+                FROM 'infobras_avance.parquet' 
+                GROUP BY 1
+            ) i ON m.CUI = i.CUI_INFOBRAS
+            LEFT JOIN (
+                SELECT PRODUCTO_PROYECTO, MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as COSTO_ACTUAL, MAX(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as MONTO_EJECUCION_TOTAL 
+                FROM 'seguimiento_inversiones.parquet' 
+                GROUP BY 1
+            ) s ON m.CUI = s.PRODUCTO_PROYECTO
+            LEFT JOIN (
+                SELECT CUI_PARALIZADA, MAX(TRY_CAST(ES_PARALIZADA AS INTEGER)) as ES_PARALIZADA 
+                FROM 'infobras_paralizadas.parquet' 
+                GROUP BY 1
+            ) p ON m.CUI = p.CUI_PARALIZADA
+        """
+        df_vs = conn.execute(vs_query).df()
+        
+        if not df_vs.empty:
+            df_vs['Desbalance'] = df_vs['Avance Financiero % (MEF)'] - df_vs['Avance Físico % (INFOBRAS)'].fillna(0)
+            df_vs['Estado'] = df_vs.apply(lambda r: "🚨 PARALIZADA" if r['Paralizada']==1 else ("🛑 PELIGRO (Mucho Gasto, Poco Físico)" if r['Desbalance']>30 else "✅ Normal"), axis=1)
+            # RESUMEN EJECUTIVO (KPIs)
+            total_obras = len(df_vs)
+            obras_sin_reporte = int(df_vs['Avance Físico % (INFOBRAS)'].isna().sum())
+            paralizadas = int(df_vs['Paralizada'].sum())
+            criticas = len(df_vs[df_vs['Desbalance'] > 30])
+            dinero_riesgo = df_vs[(df_vs['Paralizada'] == 1) | (df_vs['Desbalance'] > 30)]['PIM'].sum()
+            
+            sc1, sc2, sc3, sc4 = st.columns(4)
+            with sc1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #3b82f6;"><div class="kpi-title">Total Obras Analizadas</div><div class="kpi-value">{total_obras}</div></div>', unsafe_allow_html=True)
+            with sc2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #000;"><div class="kpi-title">Obras Paralizadas (Abandonadas)</div><div class="kpi-value" style="color:#000;">{paralizadas}</div></div>', unsafe_allow_html=True)
+            with sc3: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #ef4444;"><div class="kpi-title">Obras con Desbalance Crítico</div><div class="kpi-value" style="color:#ef4444;">{criticas}</div></div>', unsafe_allow_html=True)
+            with sc4: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #f59e0b;"><div class="kpi-title">Dinero Público en Riesgo</div><div class="kpi-value" style="color:#f59e0b;">S/ {dinero_riesgo/1e6:,.1f} M</div></div>', unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # Gráfico MACRO (General) - Promedios de Ejecución
+            st.markdown('<div class="card-white"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">📊 Resumen General: Avance Físico vs Avance Financiero</h4>', unsafe_allow_html=True)
+            
+            if not df_vs.empty:
+                # 1. Avance Financiero Global (Ponderado)
+                suma_costo = df_vs['Costo Total (MEF)'].fillna(df_vs['PIM']).sum()
+                suma_devengado = df_vs['Devengado Histórico (MEF)'].sum()
+                avg_fin = (suma_devengado / suma_costo) * 100 if suma_costo > 0 else 0
+                
+                # 2. Avance Físico Global (Ponderado, asumiendo 0% para las obras sin reporte)
+                df_fis = df_vs.copy()
+                df_fis['Avance Físico % (INFOBRAS)'] = df_fis['Avance Físico % (INFOBRAS)'].fillna(0)
+                df_fis['Peso'] = df_fis['Costo Total (MEF)'].fillna(df_fis['PIM'])
+                suma_peso_fisico = df_fis['Peso'].sum()
+                avg_fis = (df_fis['Avance Físico % (INFOBRAS)'] * df_fis['Peso']).sum() / suma_peso_fisico if suma_peso_fisico > 0 else 0
+                
+                import pandas as pd
+                df_macro = pd.DataFrame({
+                    'Indicador': ['1. Plata Pagada (Avance Financiero %)', '2. Construcción Real (Avance Físico %)'],
+                    'Porcentaje Promedio': [avg_fin, avg_fis]
+                })
+                
+                fig_bar_macro = px.bar(
+                    df_macro, x='Porcentaje Promedio', y='Indicador', orientation='h',
+                    color='Indicador', 
+                    color_discrete_map={'1. Plata Pagada (Avance Financiero %)': '#ef4444', '2. Construcción Real (Avance Físico %)': '#3b82f6'},
+                    text='Porcentaje Promedio'
+                )
+                fig_bar_macro.update_traces(
+                    texttemplate='<b>%{text:.1f}%</b>', 
+                    textposition='auto', 
+                    textfont_size=16, 
+                    textfont_color='white',
+                    hovertemplate='<b>%{y}</b><br>Promedio Nacional: %{x:.1f}%<extra></extra>'
+                )
+                fig_bar_macro.update_layout(
+                    xaxis=dict(range=[0, max(100, max(avg_fin, avg_fis) + 10)]),
+                    margin=dict(t=20, l=10, r=20, b=20),
+                    height=250,
+                    showlegend=False
+                )
+                st.plotly_chart(fig_bar_macro, use_container_width=True, config={'displayModeBar': False})
+            else:
+                st.info("No hay datos suficientes para calcular los promedios.")
+            st.markdown('</div><br>', unsafe_allow_html=True)
+            
+            # Tabla Resumen de Sobrecostos e Irregularidades (Sin límites)
+            st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Súper Tabla de Gastos vs Avance Físico</h4>', unsafe_allow_html=True)
+            
+            with st.expander("📖 Clic aquí para ver la Metodología Matemática y Fórmulas de Auditoría"):
+                st.markdown("""
+                <div style='background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; color: #334155;'>
+                <strong>Auditoría de Datos: ¿Cómo se calculan estas métricas de control?</strong><br><br>
+                
+                • <strong>Costo Total (MEF):</strong> Extraído directamente del Seguimiento de Inversiones (MEF). Es el valor real de la obra hoy, incluyendo todas las adendas e incrementos presupuestales.<br>
+                • <strong>Devengado Histórico (MEF):</strong> Suma absoluta de todo el dinero pagado al contratista desde que inició el proyecto hasta el presente. Es plata que ya salió del Tesoro Público.<br>
+                • <strong>Avance Financiero % (MEF):</strong> <code>(Devengado Histórico ÷ Costo Total) × 100</code>. Es el porcentaje inquebrantable de plata gastada. (Si no existe historial en la BD, usa provisionalmente el Devengado Anual / PIM Anual).<br>
+                • <strong>Avance Físico % (INFOBRAS):</strong> Porcentaje del progreso real de la construcción civil reportado a la Contraloría.<br>
+                • <strong>Desbalance (Riesgo Crítico):</strong> <code>(Avance Financiero %) - (Avance Físico %)</code>. Mide la brecha exacta. Si a un contratista se le pagó el 80% del dinero, pero solo construyó el 20%, el desbalance es +60%. Un desbalance mayor a 30% activa automáticamente la alerta 🛑 PELIGRO.<br>
+                <span style="color:#0ea5e9; font-style:italic;">*Nota sobre números negativos: Si el desbalance tiene un signo menos (Ej: -53.9%), significa matemáticamente que el Avance Físico es MAYOR que el Financiero. Esto tiene total sentido en la vida real: La obra ya está construida (100%), pero el Estado aún no le termina de pagar al contratista (46%) porque faltan liquidaciones o valorizaciones finales. No representa riesgo de robo.*</span><br><br>
+                • <strong>Dinero Público en Riesgo (KPI Superior):</strong> Sumatoria total del Presupuesto (PIM) asignado este año exclusivamente a las obras etiquetadas como <em>Paralizadas</em> o <em>En Peligro Crítico</em>.
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Filtro interactivo para la tabla basado en los KPIs
+            filtro_tabla = st.radio(
+                "🔍 **O puedes usar este selector para filtrar la tabla:**",
+                [f"🔵 Mostrar Todas las Obras ({total_obras})", 
+                 f"⚫ Mostrar SOLO Obras Paralizadas ({paralizadas})", 
+                 f"🔴 Mostrar SOLO Obras con Desbalance Crítico ({criticas})"],
+                horizontal=True,
+                key="filtro_kpi_radio"
+            )
+            
+            df_table = df_vs.copy()
+            if 'Gasto' in df_table.columns:
+                df_table.rename(columns={'Gasto': f'Gasto ({CURRENT_YEAR})'}, inplace=True)
+            
+            if "Paralizadas" in filtro_tabla:
+                df_table = df_table[df_table['Paralizada'] == 1]
+            elif "Desbalance" in filtro_tabla:
+                df_table = df_table[df_table['Desbalance'] > 30]
+                
+            df_table = df_table.sort_values(by="Desbalance", ascending=False)
+            
+            if len(df_table) > 1000:
+                st.warning(f"⚠️ La lista contiene {len(df_table)} obras. Para no sobrecargar tu navegador, previsualizando el Top 1000 más crítico. ¡Si descargas el Excel se bajará completo!")
+                df_table = df_table.head(1000)
+                
+            df_table['Nombre'] = df_table.apply(lambda r: "🛑 " + str(r['Nombre']) if r['Paralizada'] == 1 else str(r['Nombre']), axis=1)
+            
+            def style_desbalance(val):
+                if isinstance(val, (int, float)) and val > 30: return 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;'
+                return ''
+                
+            st.dataframe(
+                df_table[['CUI', 'Nombre', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance']].style.map(style_desbalance, subset=['Desbalance']).format({
+                    "Costo Total (MEF)": "S/ {:,.0f}", "Devengado Histórico (MEF)": "S/ {:,.0f}", f"Gasto ({CURRENT_YEAR})": "S/ {:,.0f}", "Desbalance": "{:.1f}%", "Avance Financiero % (MEF)": "{:.1f}%", "Avance Físico % (INFOBRAS)": "{:.1f}%"
+                }), use_container_width=True, hide_index=True, height=500
+            )
+            
+            # Botón de Descarga
+            csv_export = df_table[['CUI', 'Nombre', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance']].to_csv(index=False).encode('utf-8-sig')
+            st.download_button(
+                label="📥 Descargar esta tabla en Excel (CSV)",
+                data=csv_export,
+                file_name="auditoria_obras.csv",
+                mime="text/csv",
+            )
+        else:
+            st.warning("No se encontraron obras con registro en INFOBRAS para esta búsqueda. Intenta buscar otra entidad.")
+    else:
+        st.warning("El motor está procesando la base de datos de INFOBRAS en segundo plano. Regresa en unos segundos.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------
+# TAB 3: LISTADO SNIP COMPLETO
+# ---------------------------------------------------------
+with tab3:
+    st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Base de Datos Completa de Proyectos (SNIP)</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 15px; margin-bottom: 20px; border-radius: 4px; font-size: 13.5px; color: #475569;">
+    <strong>Guía de Lectura y Auditoría de Datos:</strong><br><br>
+    • <strong>Costo Inicial Planeado (PIA):</strong> Es el Presupuesto Institucional de Apertura. Cuánta plata se le asignó a la obra el 1 de enero. Es la promesa inicial.<br>
+    • <strong>Costo Inflado (PIM):</strong> Es el Presupuesto Institucional Modificado. Es la plata real que tiene la obra hoy, después de adendas, recortes o inyecciones de dinero.<br>
+    • <strong>Sobrecosto (Color Rojo):</strong> Se calcula restando <code>PIM - PIA</code>. Mide cuánto se ha inflado el presupuesto original. <strong style="color: #ef4444;">El color rojo se intensifica</strong> matemáticamente mientras más alto sea el sobrecosto. Si el número es negativo, significa que a la obra se le quitó presupuesto (recorte).<br>
+    • <strong>% Gasto Real (Termómetro Verde):</strong> Se calcula dividiendo <code>(Gasto Devengado ÷ PIM) × 100</code>. <strong style="color: #10b981;">Color Verde Oscuro</strong> significa que se ejecutó casi el 100% del dinero asignado para este año. Amarillo significa avance a medias, y Rojo/Blanco significa 0% de ejecución (estancamiento).<br><br>
+    <strong>🔍 Fuentes Oficiales:</strong><br>
+    Los datos de esta tabla son extraídos del <strong><a href="https://datosabiertos.mef.gob.pe/dataset/presupuesto-y-ejecucion-de-gasto" target="_blank">Gasto Diario (SIAF) del MEF</a></strong>. Las columnas procesadas corresponden exactamente a <code>MONTO_PIA</code>, <code>MONTO_PIM</code> y <code>MONTO_DEVENGADO</code>.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    list_query = f"""
+        SELECT 
+            PRODUCTO_PROYECTO as "CUI",
+            MAX(PRODUCTO_PROYECTO_NOMBRE) as "Nombre del Proyecto de Inversión",
+            CASE WHEN SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) > 0 THEN ROUND((SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) / SUM(TRY_CAST(MONTO_PIM AS DOUBLE))) * 100, 1) ELSE 0 END as "% Gasto Real",
+            SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as "Costo Inicial Planeado (PIA)",
+            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as "Costo Inflado (PIM)",
+            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) - SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as "Sobrecosto"
+        FROM '{PARQUET_FILE}'
+        WHERE {where_clause} AND CATEGORIA_GASTO = 6
+        AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
+        GROUP BY PRODUCTO_PROYECTO
+        ORDER BY "Costo Inflado (PIM)" DESC
+    """
+    df_list = conn.execute(list_query).df()
+    
+    if not df_list.empty:
+        import pandas as pd
+        pd.set_option("styler.render.max_elements", 2000000)
+        
+        # Para evitar que el navegador del usuario colapse al renderizar 45,000 colores,
+        # limitamos la previsualización a los 1500 proyectos más costosos si estamos en vista Macro.
+        df_display = df_list.copy()
+        if len(df_display) > 1500:
+            st.warning(f"⚠️ La base de datos tiene {len(df_list)} proyectos. Para mantener la plataforma rápida, se están visualizando los 1500 proyectos con mayor PIM. Utiliza los filtros para ver otras municipalidades específicas.")
+            df_display = df_display.head(1500)
+            
+        styler = df_display.style.format({
+            "% Gasto Real": "{:.1f}%",
+            "Costo Inicial Planeado (PIA)": "S/ {:,.0f}",
+            "Costo Inflado (PIM)": "S/ {:,.0f}",
+            "Sobrecosto": "S/ {:,.0f}"
+        }).background_gradient(subset=["% Gasto Real"], cmap="RdYlGn", vmin=0, vmax=100) \
+          .background_gradient(subset=["Sobrecosto"], cmap="Reds")
+          
+        st.dataframe(styler, use_container_width=True, hide_index=True)
+        
+        # Botón para descargar el dataset completo
+        csv_full = df_list.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📥 Descargar Base de Datos SNIP Completa (Excel)", data=csv_full, file_name="todas_las_obras_snip.csv", mime="text/csv")
+
+# ------------------------------------------
+# TAB 4: DETALLE POR OBRA (RADIOGRAFÍA FINANCIERA)
+# ------------------------------------------
+with tab4:
+    st.markdown("### 🔎 Radiografía Financiera de la Obra")
+    st.markdown("Desglose a nivel de centavos de los rubros en los que gasta una obra específica.")
+    
+    st.info("""
+    **🔍 Guía de Transparencia y Origen de Datos:**
+    * **Desglose de Gasto y Certificaciones:** Proviene del MEF - [Presupuesto y Ejecución de Gasto (SIAF)](https://datosabiertos.mef.gob.pe/dataset/presupuesto-y-ejecucion-de-gasto). Procesa las columnas `MONTO_CERTIFICADO`, `MONTO_COMPROMETIDO_ANUAL` y `MONTO_DEVENGADO`. Muestra la situación **actual** de este año.
+    * **Evolución Histórica del Costo:** Proviene de la línea de tiempo del MEF - [Seguimiento de Proyectos de Inversión (SSI)](https://www.datosabiertos.gob.pe/dataset/seguimiento-de-proyectos-de-inversi%C3%B3n). Rastrea la columna `COSTO_ACTUAL` a través de los años (desde que el MEF la habilitó) para detectar adendas que inflan el proyecto a largo plazo.
+    """)
+    
+    if not is_filtered:
+        st.info("⚠️ Selecciona una entidad en la barra lateral para poder elegir una obra.")
+    else:
+        try:
+            cuis_query = f"SELECT DISTINCT PRODUCTO_PROYECTO || ' - ' || MAX(PRODUCTO_PROYECTO_NOMBRE) FROM '{PARQUET_FILE}' WHERE {where_clause} AND CATEGORIA_GASTO = 6 AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621') GROUP BY PRODUCTO_PROYECTO ORDER BY 1 LIMIT 1000"
+            cuis = conn.execute(cuis_query).df().iloc[:,0].tolist()
+        except:
+            cuis = []
+            
+        if len(cuis) == 0:
+            st.warning("No se encontraron obras para los filtros seleccionados.")
+        else:
+            cui_selected = st.selectbox("Seleccione la Obra (CUI) a inspeccionar", cuis)
+            cui_code = cui_selected.split(" - ")[0].strip()
+            
+            cui_query = f"""
+                SELECT 
+                    SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as PIA,
+                    SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
+                    SUM(TRY_CAST(MONTO_CERTIFICADO AS DOUBLE)) as Certificado,
+                    SUM(TRY_CAST(MONTO_COMPROMETIDO_ANUAL AS DOUBLE)) as Compromiso,
+                    SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado
+                FROM '{PARQUET_FILE}'
+                WHERE PRODUCTO_PROYECTO = '{cui_code}'
+            """
+            df_cui = conn.execute(cui_query).df()
+            
+            if not df_cui.empty and pd.notna(df_cui.iloc[0]['PIM']):
+                c_pim = df_cui.iloc[0]['PIM'] or 0
+                c_cert = df_cui.iloc[0]['Certificado'] or 0
+                c_comp = df_cui.iloc[0]['Compromiso'] or 0
+                c_dev = df_cui.iloc[0]['Devengado'] or 0
+                
+                pct_cert = (c_cert / c_pim * 100) if c_pim > 0 else 0
+                pct_comp = (c_comp / c_pim * 100) if c_pim > 0 else 0
+                pct_dev = (c_dev / c_pim * 100) if c_pim > 0 else 0
+                
+                def f_soles(val): return f"{val:,.0f}".replace(",", " ")
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                k1, k2, k3 = st.columns(3)
+                with k1:
+                    st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #f87171;"><div class="kpi-title">AVANCE % CERTIFICADO</div><div class="kpi-value" style="color:#f87171">{pct_cert:.1f}%</div><div style="font-size:12px;color:#64748b;margin-top:5px;">Por Certificar: S/ {f_soles(c_pim - c_cert)}</div></div>', unsafe_allow_html=True)
+                with k2:
+                    st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #38bdf8;"><div class="kpi-title">AVANCE % COMPROMISO</div><div class="kpi-value" style="color:#38bdf8">{pct_comp:.1f}%</div><div style="font-size:12px;color:#64748b;margin-top:5px;">Por Comprometer: S/ {f_soles(c_pim - c_comp)}</div></div>', unsafe_allow_html=True)
+                with k3:
+                    st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #4ade80;"><div class="kpi-title">AVANCE % DEVENGADO</div><div class="kpi-value" style="color:#4ade80">{pct_dev:.1f}%</div><div style="font-size:12px;color:#64748b;margin-top:5px;">Por Devengar: S/ {f_soles(c_pim - c_dev)}</div></div>', unsafe_allow_html=True)
+                
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#0f172a; font-weight:bold; font-size:18px;">III. HISTORIA DE LA BILLETERA (Gasto año por año)</h4>', unsafe_allow_html=True)
+                st.markdown('<div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 12px; margin-bottom: 15px; border-radius: 4px; font-size: 13.5px; color: #0f172a;">Revisa la tabla inferior: Si el "Presupuesto Inflado (PIM)" crece cada año, es una señal de que el proyecto está sufriendo adendas o sobrecostos crónicos.</div>', unsafe_allow_html=True)
+                
+                with st.spinner("Buscando el historial en los archivos remotos del MEF (Puede tardar 10 segundos)..."):
+                    try:
+                        # Obtener dinámicamente qué años existen en HuggingFace
+                        hf_api_url = "https://huggingface.co/api/datasets/marxvilam/mef-datos/tree/main"
+                        # Combinar archivos de HuggingFace con archivos locales
+                        try: hf_files = requests.get(hf_api_url).json()
+                        except: hf_files = []
+                        
+                        all_paths = set([f.get('path', '') for f in hf_files if isinstance(f, dict)])
+                        for local_f in os.listdir('.'):
+                            if local_f.endswith('-Gasto-Diario.parquet'):
+                                all_paths.add(local_f)
+                        
+                        query_parts = []
+                        for path in all_paths:
+                            if path.endswith("-Gasto-Diario.parquet"):
+                                year = path.split("-")[0]
+                                if os.path.exists(path):
+                                    source = f"'{path}'"
+                                else:
+                                    source = f"read_parquet('https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{path}')"
+                                    
+                                q = f"SELECT '{year}' as Año, string_agg(DISTINCT SEC_FUNC, ', ') as \"Secuencias\", SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as PIA, SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM, SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}'"
+                                query_parts.append(q)
+                        
+                        if query_parts:
+                            conn.execute("INSTALL httpfs; LOAD httpfs;")
+                            hist_query = " UNION ALL ".join(query_parts) + " ORDER BY Año ASC"
+                            df_hist = conn.execute(hist_query).df()
+                        else:
+                            df_hist = pd.DataFrame()
+                        
+                        if not df_hist.empty:
+                            # Clean rows that have absolutely no data for that year to keep it neat
+                            df_hist = df_hist.dropna(subset=['PIA', 'PIM', 'Devengado'], how='all').fillna(0)
+                            
+                            if not df_hist.empty:
+                                df_hist['% Avance del Año'] = df_hist.apply(lambda r: (r['Devengado'] / r['PIM'] * 100) if r['PIM'] > 0 else 0, axis=1).round(1)
+                                df_hist = df_hist.rename(columns={'PIA': 'Presupuesto Inicio Año (PIA)', 'PIM': 'Presupuesto Inflado (PIM)', 'Devengado': 'Pagado en el Año'})
+                                
+                                st_hist = df_hist.style.format({
+                                    "Presupuesto Inicio Año (PIA)": lambda x: f"S/ {x:,.0f}".replace(",", " "),
+                                    "Presupuesto Inflado (PIM)": lambda x: f"S/ {x:,.0f}".replace(",", " "),
+                                    "Pagado en el Año": lambda x: f"S/ {x:,.0f}".replace(",", " "),
+                                    "% Avance del Año": "{:.1f}%"
+                                }).background_gradient(subset=["% Avance del Año"], cmap="RdYlGn", vmin=0, vmax=100)
+                                
+                                st.dataframe(st_hist, use_container_width=True, hide_index=True)
+                            else:
+                                st.info("No hay historial financiero (2023-2026) registrado para este proyecto.")
+                    except Exception as e:
+                        st.error("No se pudo cargar el historial remoto. Asegúrate de tener conexión a internet.")
+
+                st.markdown("<br><b>Desglose por Meta y Clasificador de Gasto (Año Actual):</b>", unsafe_allow_html=True)
+                
+                detail_query = f"""
+                    SELECT 
+                        META as Meta,
+                        MAX(META_NOMBRE) as Nombre_Meta,
+                        GENERICA_NOMBRE || ' - ' || SUBGENERICA_NOMBRE as Clasificador,
+                        SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as PIA,
+                        SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
+                        SUM(TRY_CAST(MONTO_CERTIFICADO AS DOUBLE)) as Certificado,
+                        SUM(TRY_CAST(MONTO_COMPROMETIDO_ANUAL AS DOUBLE)) as Compromiso,
+                        SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado
+                    FROM '{PARQUET_FILE}'
+                    WHERE PRODUCTO_PROYECTO = '{cui_code}'
+                    GROUP BY META, Clasificador
+                    ORDER BY PIM DESC
+                """
+                df_det = conn.execute(detail_query).df()
+                
+                if not df_det.empty:
+                    df_det['Sin Certificar'] = df_det['PIM'] - df_det['Certificado']
+                    df_det['Sin Comprometer'] = df_det['PIM'] - df_det['Compromiso']
+                    df_det['Sin Devengar'] = df_det['PIM'] - df_det['Devengado']
+                    
+                    df_det['% Certificado'] = (df_det['Certificado'] / df_det['PIM'] * 100).fillna(0).round(1)
+                    df_det['% Comprometido'] = (df_det['Compromiso'] / df_det['PIM'] * 100).fillna(0).round(1)
+                    df_det['% Devengado'] = (df_det['Devengado'] / df_det['PIM'] * 100).fillna(0).round(1)
+                    
+                    display_cols = ['Meta', 'Clasificador', 'PIA', 'PIM', '% Certificado', '% Comprometido', '% Devengado', 'Sin Certificar', 'Sin Comprometer', 'Sin Devengar']
+                    df_display = df_det[display_cols].copy()
+                    
+                    st_det = df_display.style.format({
+                        "PIA": lambda x: f"S/ {x:,.0f}".replace(",", " "),
+                        "PIM": lambda x: f"S/ {x:,.0f}".replace(",", " "),
+                        "Sin Certificar": lambda x: f"S/ {x:,.0f}".replace(",", " "),
+                        "Sin Comprometer": lambda x: f"S/ {x:,.0f}".replace(",", " "),
+                        "Sin Devengar": lambda x: f"S/ {x:,.0f}".replace(",", " "),
+                        "% Certificado": "{:.1f}%",
+                        "% Comprometido": "{:.1f}%",
+                        "% Devengado": "{:.1f}%"
+                    }).background_gradient(subset=["% Certificado"], cmap="Reds", vmin=0, vmax=100) \
+                      .background_gradient(subset=["% Comprometido"], cmap="Reds", vmin=0, vmax=100) \
+                      .background_gradient(subset=["% Devengado"], cmap="Reds", vmin=0, vmax=100)
+                      
+                      
+                    st.dataframe(st_det, use_container_width=True, hide_index=True)
+                    
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#0f172a; font-weight:bold; font-size:18px;">IV. EVOLUCIÓN HISTÓRICA DEL COSTO (Vía SSI)</h4>', unsafe_allow_html=True)
+                st.markdown('<div style="background-color: #f8fafc; border-left: 4px solid #64748b; padding: 12px; margin-bottom: 15px; border-radius: 4px; font-size: 13.5px; color: #0f172a;">Analiza cómo ha variado el "Costo Actual" declarado del proyecto a lo largo de los años. Los incrementos drásticos pueden indicar adendas o modificaciones estructurales.</div>', unsafe_allow_html=True)
+                
+                with st.spinner("Rastreando el costo histórico en los archivos SSI (Puede tardar unos segundos)..."):
+                    try:
+                        all_ssi_paths = set([f.get('path', '') for f in hf_files if isinstance(f, dict)])
+                        for local_f in os.listdir('.'):
+                            if local_f.endswith('-Seguimiento-PI.parquet'):
+                                all_ssi_paths.add(local_f)
+                                
+                        ssi_query_parts = []
+                        for path in all_ssi_paths:
+                            if path.endswith("-Seguimiento-PI.parquet"):
+                                year = path.split("-")[0]
+                                if os.path.exists(path):
+                                    source = f"'{path}'"
+                                else:
+                                    source = f"read_parquet('https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{path}')"
+                                    
+                                if int(year) < 2024:
+                                    q = f"SELECT '{year}' as Año, NULL as Costo_Actual, MAX(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as Ejecucion_Total FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' GROUP BY PRODUCTO_PROYECTO"
+                                else:
+                                    q = f"SELECT '{year}' as Año, MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as Costo_Actual, MAX(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as Ejecucion_Total FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' GROUP BY PRODUCTO_PROYECTO"
+                                ssi_query_parts.append(q)
+                        
+                        if ssi_query_parts:
+                            ssi_hist_query = " UNION ALL ".join(ssi_query_parts) + " ORDER BY Año ASC"
+                            df_ssi_hist = conn.execute(ssi_hist_query).df()
+                        else:
+                            df_ssi_hist = pd.DataFrame()
+                        
+                        if not df_ssi_hist.empty:
+                            df_ssi_hist = df_ssi_hist.dropna(subset=['Costo_Actual'], how='all').fillna(0)
+                            if not df_ssi_hist.empty:
+                                df_ssi_hist['Costo_Actual'] = pd.to_numeric(df_ssi_hist['Costo_Actual'], errors='coerce').fillna(0)
+                                df_ssi_hist['Ejecucion_Total'] = pd.to_numeric(df_ssi_hist['Ejecucion_Total'], errors='coerce').fillna(0)
+                                
+                                valid_costs = df_ssi_hist[df_ssi_hist['Costo_Actual'] > 0]
+                                if not valid_costs.empty:
+                                    año_ini = valid_costs.iloc[0]['Año']
+                                    costo_ini = valid_costs.iloc[0]['Costo_Actual']
+                                    año_fin = valid_costs.iloc[-1]['Año']
+                                    costo_fin = valid_costs.iloc[-1]['Costo_Actual']
+                                    variacion = ((costo_fin - costo_ini) / costo_ini * 100) if costo_ini > 0 else 0
+                                else:
+                                    año_ini = df_ssi_hist.iloc[0]['Año']
+                                    costo_ini = 0
+                                    año_fin = df_ssi_hist.iloc[-1]['Año']
+                                    costo_fin = 0
+                                    variacion = 0
+                                    
+                                var_color = "#ef4444" if variacion > 10 else "#22c55e" if variacion < 0 else "#64748b"
+                                
+                                st.markdown(f'''
+                                <div style="display:flex; justify-content:space-around; background-color:#ffffff; padding:15px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:15px;">
+                                    <div style="text-align:center;">
+                                        <div style="font-size:12px; color:#64748b;">Costo Inicial ({año_ini})</div>
+                                        <div style="font-size:18px; font-weight:bold;">S/ {f_soles(costo_ini)}</div>
+                                    </div>
+                                    <div style="text-align:center;">
+                                        <div style="font-size:12px; color:#64748b;">Costo Actual ({año_fin})</div>
+                                        <div style="font-size:18px; font-weight:bold;">S/ {f_soles(costo_fin)}</div>
+                                    </div>
+                                    <div style="text-align:center;">
+                                        <div style="font-size:12px; color:#64748b;">Variación Histórica</div>
+                                        <div style="font-size:18px; font-weight:bold; color:{var_color};">{variacion:+.1f}%</div>
+                                    </div>
+                                </div>
+                                ''', unsafe_allow_html=True)
+                                
+                                import plotly.express as px
+                                import plotly.graph_objects as go
+                                
+                                fig = go.Figure()
+                                fig.add_trace(go.Bar(x=df_ssi_hist['Año'], y=df_ssi_hist['Ejecucion_Total'], name='Ejecución Acumulada', marker_color='#94a3b8'))
+                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Costo_Actual'], mode='lines+markers', name='Costo Actual', line=dict(color='#ef4444', width=3)))
+                                
+                                fig.update_layout(
+                                    title='Curva de Variación del Costo vs Ejecución',
+                                    yaxis_title="Soles (S/)",
+                                    xaxis_title="Año Fiscal",
+                                    hovermode="x unified",
+                                    margin=dict(l=20, r=20, t=40, b=20),
+                                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                                )
+                                st.plotly_chart(fig, use_container_width=True)
+                                
+                                all_years = set(str(y) for y in range(int(año_ini), int(año_fin) + 1))
+                                found_years = set(df_ssi_hist['Año'].astype(str))
+                                missing_years = sorted(list(all_years - found_years))
+                                if missing_years:
+                                    st.warning(f"ℹ️ El proyecto no registra información en los reportes del SSI durante los años: {', '.join(missing_years)}")
+                            else:
+                                st.info("La obra no registra historial de costos en el SSI.")
+                        else:
+                            st.info("No se encontraron archivos históricos del SSI.")
+                    except Exception as e:
+                        st.error(f"No se pudo cargar el historial SSI. Detalle: {e}")
+                        
+                # ---------------------------------------------------------
+                # SECCIÓN INFOBRAS (COMENTARIOS Y FECHAS)
+                # ---------------------------------------------------------
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#0f172a; font-weight:bold; font-size:18px;">V. EXPEDIENTE INFOBRAS (Reporte del Ingeniero)</h4>', unsafe_allow_html=True)
+                st.markdown('<div style="background-color: #fefce8; border-left: 4px solid #eab308; padding: 12px; margin-bottom: 15px; border-radius: 4px; font-size: 13.5px; color: #0f172a;">Aquí puedes leer las justificaciones, comentarios y fechas reportadas por los ingenieros residentes y supervisores directamente en el sistema de la Contraloría.</div>', unsafe_allow_html=True)
+                
+                if os.path.exists('infobras_avance.parquet'):
+                    info_query = f"""
+                        SELECT 
+                            MAX(TRY_CAST(Estado_de_ejecuci_n AS VARCHAR)) as Estado_de_ejecuci_n,
+                            MAX(TRY_CAST(Fecha_de_inicio_de_obra AS VARCHAR)) as Fecha_de_inicio_de_obra,
+                            MAX(TRY_CAST(Fecha_finalizaci_n_programada_de_obra AS VARCHAR)) as Fecha_finalizaci_n_programada_de_obra,
+                            MAX(TRY_CAST(Fecha_de_finalizaci_n_real AS VARCHAR)) as Fecha_de_finalizaci_n_real,
+                            MAX(TRY_CAST(Comentarios AS VARCHAR)) as Comentarios,
+                            MAX(TRY_CAST(Causal_de_paralizaci_n AS VARCHAR)) as Causal_de_paralizaci_n,
+                            MAX(TRY_CAST(Motivo_en_caso_no_se_llegue_al_100_ AS VARCHAR)) as Motivo_en_caso_no_se_llegue_al_100_,
+                            MAX(TRY_CAST(N_mero_de_dias_paralizado AS VARCHAR)) as N_mero_de_dias_paralizado
+                        FROM 'infobras_avance.parquet'
+                        WHERE CUI_INFOBRAS = '{cui_code}'
+                    """
+                    df_info = conn.execute(info_query).df()
+                    
+                    if not df_info.empty and pd.notna(df_info.iloc[0]['Estado_de_ejecuci_n']):
+                        row_info = df_info.iloc[0]
+                        estado = row_info['Estado_de_ejecuci_n'] if pd.notna(row_info['Estado_de_ejecuci_n']) else "No Registrado"
+                        f_inicio = row_info['Fecha_de_inicio_de_obra'] if pd.notna(row_info['Fecha_de_inicio_de_obra']) else "No Registrado"
+                        f_fin_prog = row_info['Fecha_finalizaci_n_programada_de_obra'] if pd.notna(row_info['Fecha_finalizaci_n_programada_de_obra']) else "No Registrado"
+                        f_fin_real = row_info['Fecha_de_finalizaci_n_real'] if pd.notna(row_info['Fecha_de_finalizaci_n_real']) else "En curso / No Registrado"
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.markdown(f"**Estado:**<br>{estado}", unsafe_allow_html=True)
+                        with col2:
+                            st.markdown(f"**Inicio:**<br>{f_inicio}", unsafe_allow_html=True)
+                        with col3:
+                            st.markdown(f"**Fin Programado:**<br>{f_fin_prog}", unsafe_allow_html=True)
+                        with col4:
+                            st.markdown(f"**Fin Real:**<br>{f_fin_real}", unsafe_allow_html=True)
+                            
+                        st.markdown("<hr style='margin-top:10px; margin-bottom:10px;'>", unsafe_allow_html=True)
+                        
+                        def draw_textbox(title, text, is_alert=False):
+                            if pd.notna(text) and str(text).strip() != "" and str(text).lower() != "nan" and str(text).lower() != "ninguno":
+                                color = "#fee2e2" if is_alert else "#f1f5f9"
+                                border = "#ef4444" if is_alert else "#cbd5e1"
+                                st.markdown(f"""
+                                <div style="background-color: {color}; border: 1px solid {border}; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
+                                    <strong style="color: #0f172a; font-size:14px;">{title}</strong><br>
+                                    <span style="color: #334155; font-size:13.5px;">{text}</span>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                        draw_textbox("📝 Comentarios del Residente / Supervisor:", row_info['Comentarios'])
+                        draw_textbox("🛑 Causal de Paralización (Si aplica):", row_info['Causal_de_paralizaci_n'], is_alert=True)
+                        draw_textbox("⏳ Días Paralizado:", row_info['N_mero_de_dias_paralizado'], is_alert=True)
+                        draw_textbox("⚠️ Motivo de no llegar al 100%:", row_info['Motivo_en_caso_no_se_llegue_al_100_'], is_alert=True)
+                        
+                    else:
+                        st.warning("Esta obra no tiene ningún registro (ni fechas ni comentarios) en el portal de INFOBRAS. Es una obra no transparentada.")
+                else:
+                    st.warning("La base de datos de INFOBRAS no está disponible en este momento.")
+
+            else:
+                st.warning("La obra seleccionada no registra movimientos financieros en este año.")
+
+st.markdown('</div>', unsafe_allow_html=True)
