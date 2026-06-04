@@ -440,16 +440,7 @@ with tab1:
 with tab2:
     st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
     st.markdown('<h2 style="text-align:center;">🚨 VERSUS: Ejecución Física vs Financiera</h2>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subtitle">Detección de "Obras Fantasma": Mucho dinero gastado, pero muy poco avance en la construcción real.</div>', unsafe_allow_html=True)
-    
-    st.info("""
-    **🔍 Guía de Transparencia y Origen de Datos (Fuentes Cruzadas):**
-    Para esta tabla se descarta el presupuesto anual y se cruza el historial completo de toda la vida de la obra en dos mundos distintos:
-    
-    * 🏗️ **Físico (La Construcción Real):** Extraído de la Contraloría - [Obras Públicas INFOBRAS](https://infobras.contraloria.gob.pe/InfobrasWeb/DataSets). Se rescata la columna `Avance Físico Ejecutado Acumulado (%)`. Si la municipalidad no reportó la obra en este portal, el sistema asigna matemáticamente un avance físico de **0.0%**.
-    * 💰 **Financiero (La Plata Pagada):** Extraído del MEF - [Seguimiento de Proyectos de Inversión (SSI)](https://www.datosabiertos.gob.pe/dataset/seguimiento-de-proyectos-de-inversi%C3%B3n). Se procesa dividiendo la columna `MONTO_EJECUCION_TOTAL` (todo lo gastado históricamente) entre el `COSTO_ACTUAL`.
-    * 🔗 **El Cruce:** El algoritmo enlaza ambas bases de datos usando el **Código Único de Inversión (CUI)** para revelar si lo que se pagó coincide con lo que se construyó.
-    """)
+    st.markdown('<div class="section-subtitle">Detección de Brechas de Ejecución: Obras con alto nivel de gasto pero bajo nivel de avance físico reportado.</div>', unsafe_allow_html=True)
     
     if os.path.exists('infobras_avance.parquet'):
         vs_query = f"""
@@ -493,7 +484,7 @@ with tab2:
         
         if not df_vs.empty:
             df_vs['Desbalance'] = df_vs['Avance Financiero % (MEF)'] - df_vs['Avance Físico % (INFOBRAS)'].fillna(0)
-            df_vs['Estado'] = df_vs.apply(lambda r: "🚨 PARALIZADA" if r['Paralizada']==1 else ("🛑 PELIGRO (Mucho Gasto, Poco Físico)" if r['Desbalance']>30 else "✅ Normal"), axis=1)
+            df_vs['Estado'] = df_vs.apply(lambda r: "⚠️ PARALIZADA" if r['Paralizada']==1 else ("⚠️ DESFASE (Financiero > Físico)" if r['Desbalance']>30 else "✅ Normal"), axis=1)
             # RESUMEN EJECUTIVO (KPIs)
             total_obras = len(df_vs)
             obras_sin_reporte = int(df_vs['Avance Físico % (INFOBRAS)'].isna().sum())
@@ -502,10 +493,10 @@ with tab2:
             dinero_riesgo = df_vs[(df_vs['Paralizada'] == 1) | (df_vs['Desbalance'] > 30)]['PIM'].sum()
             
             sc1, sc2, sc3, sc4 = st.columns(4)
-            with sc1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #3b82f6;"><div class="kpi-title">Total Obras Analizadas</div><div class="kpi-value">{total_obras}</div></div>', unsafe_allow_html=True)
-            with sc2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #000;"><div class="kpi-title">Obras Paralizadas (Abandonadas)</div><div class="kpi-value" style="color:#000;">{paralizadas}</div></div>', unsafe_allow_html=True)
-            with sc3: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #ef4444;"><div class="kpi-title">Obras con Desbalance Crítico</div><div class="kpi-value" style="color:#ef4444;">{criticas}</div></div>', unsafe_allow_html=True)
-            with sc4: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #f59e0b;"><div class="kpi-title">Dinero Público en Riesgo</div><div class="kpi-value" style="color:#f59e0b;">S/ {dinero_riesgo/1e6:,.1f} M</div></div>', unsafe_allow_html=True)
+            with sc1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #3b82f6;"><div class="kpi-title">Total Obras Analizadas</div><div class="kpi-value">{total_obras}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras únicas extraídas del cruce MEF-Contraloría.</div></div>', unsafe_allow_html=True)
+            with sc2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #000;"><div class="kpi-title">Obras Paralizadas (INFOBRAS)</div><div class="kpi-value" style="color:#000;">{paralizadas}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras oficialmente reportadas como detenidas en INFOBRAS.</div></div>', unsafe_allow_html=True)
+            with sc3: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #ef4444;"><div class="kpi-title">Obras con Desfase Crítico</div><div class="kpi-value" style="color:#ef4444;">{criticas}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Brecha entre avance financiero y físico > 30%.</div></div>', unsafe_allow_html=True)
+            with sc4: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #f59e0b;"><div class="kpi-title">Presupuesto con Alerta de Desfase</div><div class="kpi-value" style="color:#f59e0b;">S/ {dinero_riesgo/1e6:,.1f} M</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Presupuesto actual (PIM) asignado a obras paralizadas o con desfase mayor al 30%.</div></div>', unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
             
             # Gráfico MACRO (General) - Promedios de Ejecución
@@ -566,9 +557,9 @@ with tab2:
                 • <strong>Devengado Histórico (MEF):</strong> Suma absoluta de todo el dinero pagado al contratista desde que inició el proyecto hasta el presente. Es plata que ya salió del Tesoro Público.<br>
                 • <strong>Avance Financiero % (MEF):</strong> <code>(Devengado Histórico ÷ Costo Total) × 100</code>. Es el porcentaje inquebrantable de plata gastada. (Si no existe historial en la BD, usa provisionalmente el Devengado Anual / PIM Anual).<br>
                 • <strong>Avance Físico % (INFOBRAS):</strong> Porcentaje del progreso real de la construcción civil reportado a la Contraloría.<br>
-                • <strong>Desbalance (Riesgo Crítico):</strong> <code>(Avance Financiero %) - (Avance Físico %)</code>. Mide la brecha exacta. Si a un contratista se le pagó el 80% del dinero, pero solo construyó el 20%, el desbalance es +60%. Un desbalance mayor a 30% activa automáticamente la alerta 🛑 PELIGRO.<br>
-                <span style="color:#0ea5e9; font-style:italic;">*Nota sobre números negativos: Si el desbalance tiene un signo menos (Ej: -53.9%), significa matemáticamente que el Avance Físico es MAYOR que el Financiero. Esto tiene total sentido en la vida real: La obra ya está construida (100%), pero el Estado aún no le termina de pagar al contratista (46%) porque faltan liquidaciones o valorizaciones finales. No representa riesgo de robo.*</span><br><br>
-                • <strong>Dinero Público en Riesgo (KPI Superior):</strong> Sumatoria total del Presupuesto (PIM) asignado este año exclusivamente a las obras etiquetadas como <em>Paralizadas</em> o <em>En Peligro Crítico</em>.
+                • <strong>Desbalance (Brecha de Avance):</strong> <code>(Avance Financiero %) - (Avance Físico %)</code>. Mide la brecha exacta. Si a un contratista se le pagó el 80% del dinero, pero solo construyó el 20%, el desfase es +60%. Un desfase mayor a 30% activa automáticamente la alerta ⚠️ DESFASE.<br>
+                <span style="color:#0ea5e9; font-style:italic;">*Nota sobre números negativos: Si el desfase tiene un signo menos (Ej: -53.9%), significa matemáticamente que el Avance Físico es MAYOR que el Financiero. Esto tiene total sentido en la vida real: La obra ya está construida (100%), pero el Estado aún no le termina de pagar al contratista (46%) porque faltan liquidaciones o valorizaciones finales. Es un escenario financiero normal.*</span><br><br>
+                • <strong>Presupuesto con Alerta de Desfase (KPI Superior):</strong> Sumatoria total del Presupuesto (PIM) asignado este año exclusivamente a las obras etiquetadas como <em>Paralizadas</em> o <em>Con Desfase Crítico</em>.
                 </div>
                 """, unsafe_allow_html=True)
             
@@ -577,7 +568,7 @@ with tab2:
                 "🔍 **O puedes usar este selector para filtrar la tabla:**",
                 [f"🔵 Mostrar Todas las Obras ({total_obras})", 
                  f"⚫ Mostrar SOLO Obras Paralizadas ({paralizadas})", 
-                 f"🔴 Mostrar SOLO Obras con Desbalance Crítico ({criticas})"],
+                 f"🔴 Mostrar SOLO Obras con Desfase Crítico ({criticas})"],
                 horizontal=True,
                 key="filtro_kpi_radio"
             )
@@ -610,6 +601,14 @@ with tab2:
             )
             
             # Botón de Descarga
+            st.info("""
+            **🔍 Guía de Transparencia y Origen de Datos (Fuentes Cruzadas):** Para esta tabla se descarta el presupuesto anual y se cruza el historial completo de toda la vida de la obra en dos mundos distintos:
+            
+            * 🏗️ **Físico (La Construcción Real):** Extraído de la Contraloría - [Obras Públicas INFOBRAS](https://infobras.contraloria.gob.pe/InfobrasWeb/DataSets). Se rescata la columna `Avance Físico Ejecutado Acumulado (%)`. Si la municipalidad no reportó la obra en este portal, el sistema asigna matemáticamente un avance físico de 0.0%.
+            * 💰 **Financiero (La Plata Pagada):** Extraído del MEF - [Seguimiento de Proyectos de Inversión (SSI)](https://www.datosabiertos.gob.pe/dataset/seguimiento-de-proyectos-de-inversi%C3%B3n). Se procesa dividiendo la columna `MONTO_EJECUCION_TOTAL` (todo lo gastado históricamente) entre el `COSTO_ACTUAL`.
+            * 🔗 **El Cruce:** El algoritmo enlaza ambas bases de datos usando el **Código Único de Inversión (CUI)** para revelar si lo que se pagó coincide con lo que se construyó.
+            """)
+
             csv_export = df_table[['CUI', 'Nombre', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance']].to_csv(index=False).encode('utf-8-sig')
             st.download_button(
                 label="📥 Descargar esta tabla en Excel (CSV)",
