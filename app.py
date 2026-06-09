@@ -606,51 +606,104 @@ with tab2:
             with sc_ghost2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Presupuesto Absorbido (Obras Vencidas)</div><div class="kpi-value" style="color:#8b5cf6;">S/ {dinero_vencido/1e6:,.1f} M</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Dinero que siguen "chupando" hoy las obras que legalmente ya debieron entregarse.</div></div>', unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # Gráfico MACRO (General) - Promedios de Ejecución
-            st.markdown('<div class="card-white"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">📊 Resumen General: Avance Físico vs Avance Financiero</h4>', unsafe_allow_html=True)
+            # Gráficos MACRO (Promedios y Gestiones)
+            col_macro, col_gest = st.columns(2)
+            
+            with col_macro:
+                st.markdown('<div class="card-white" style="height:350px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">📊 Resumen General: Físico vs Financiero</h4>', unsafe_allow_html=True)
+                if not df_vs.empty:
+                    # 1. Avance Financiero Global (Ponderado)
+                    suma_costo = df_vs['Costo Total (MEF)'].fillna(df_vs['PIM']).sum()
+                    suma_devengado = df_vs['Devengado Histórico (MEF)'].sum()
+                    avg_fin = (suma_devengado / suma_costo) * 100 if suma_costo > 0 else 0
+                    
+                    # 2. Avance Físico Global (Ponderado)
+                    df_fis = df_vs.copy()
+                    df_fis['Avance Físico % (INFOBRAS)'] = df_fis['Avance Físico % (INFOBRAS)'].fillna(0)
+                    df_fis['Peso'] = df_fis['Costo Total (MEF)'].fillna(df_fis['PIM'])
+                    suma_peso_fisico = df_fis['Peso'].sum()
+                    avg_fis = (df_fis['Avance Físico % (INFOBRAS)'] * df_fis['Peso']).sum() / suma_peso_fisico if suma_peso_fisico > 0 else 0
+                    
+                    import pandas as pd
+                    df_macro = pd.DataFrame({
+                        'Indicador': ['1. Plata Pagada<br>(Av. Financiero)', '2. Construcción Real<br>(Av. Físico)'],
+                        'Porcentaje Promedio': [avg_fin, avg_fis]
+                    })
+                    
+                    fig_bar_macro = px.bar(
+                        df_macro, x='Porcentaje Promedio', y='Indicador', orientation='h',
+                        color='Indicador', 
+                        color_discrete_map={'1. Plata Pagada<br>(Av. Financiero)': '#ef4444', '2. Construcción Real<br>(Av. Físico)': '#3b82f6'},
+                        text='Porcentaje Promedio'
+                    )
+                    fig_bar_macro.update_traces(
+                        texttemplate='<b>%{text:.1f}%</b>', 
+                        textposition='auto', 
+                        textfont_size=16, 
+                        textfont_color='white'
+                    )
+                    fig_bar_macro.update_layout(
+                        xaxis=dict(range=[0, max(100, max(avg_fin, avg_fis) + 10)]),
+                        margin=dict(t=20, l=10, r=20, b=20),
+                        height=250,
+                        showlegend=False
+                    )
+                    st.plotly_chart(fig_bar_macro, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("No hay datos.")
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            with col_gest:
+                st.markdown('<div class="card-white" style="height:350px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">🏛️ Cantidad de Obras por Gestión (Origen)</h4>', unsafe_allow_html=True)
+                if not df_vs.empty:
+                    df_gest = df_vs['Gestión de Origen'].value_counts().reset_index()
+                    df_gest.columns = ['Gestión', 'Cantidad de Obras']
+                    # Sort to show newest first, except Indeterminada
+                    df_gest = df_gest.sort_values(by="Gestión", ascending=False)
+                    
+                    fig_gest = px.bar(
+                        df_gest, x='Cantidad de Obras', y='Gestión', orientation='h',
+                        color='Cantidad de Obras', color_continuous_scale='Purp',
+                        text='Cantidad de Obras'
+                    )
+                    fig_gest.update_traces(textposition='outside')
+                    fig_gest.update_layout(
+                        margin=dict(t=20, l=10, r=40, b=20),
+                        height=250,
+                        showlegend=False,
+                        coloraxis_showscale=False
+                    )
+                    st.plotly_chart(fig_gest, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("No hay datos.")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<br>', unsafe_allow_html=True)
             
             if not df_vs.empty:
-                # 1. Avance Financiero Global (Ponderado)
-                suma_costo = df_vs['Costo Total (MEF)'].fillna(df_vs['PIM']).sum()
-                suma_devengado = df_vs['Devengado Histórico (MEF)'].sum()
-                avg_fin = (suma_devengado / suma_costo) * 100 if suma_costo > 0 else 0
+                st.markdown('<div class="card-white" style="margin-top:10px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">⚖️ Desempeño Promedio por Gestión (Avance Físico vs Avance Financiero)</h4>', unsafe_allow_html=True)
                 
-                # 2. Avance Físico Global (Ponderado, asumiendo 0% para las obras sin reporte)
-                df_fis = df_vs.copy()
-                df_fis['Avance Físico % (INFOBRAS)'] = df_fis['Avance Físico % (INFOBRAS)'].fillna(0)
-                df_fis['Peso'] = df_fis['Costo Total (MEF)'].fillna(df_fis['PIM'])
-                suma_peso_fisico = df_fis['Peso'].sum()
-                avg_fis = (df_fis['Avance Físico % (INFOBRAS)'] * df_fis['Peso']).sum() / suma_peso_fisico if suma_peso_fisico > 0 else 0
+                # Promedio simple por cada gestión
+                df_gest_perf = df_vs.groupby('Gestión de Origen')[['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)']].mean().reset_index()
+                df_gest_perf = df_gest_perf.sort_values(by="Gestión de Origen", ascending=False)
                 
-                import pandas as pd
-                df_macro = pd.DataFrame({
-                    'Indicador': ['1. Plata Pagada (Avance Financiero %)', '2. Construcción Real (Avance Físico %)'],
-                    'Porcentaje Promedio': [avg_fin, avg_fis]
-                })
+                df_gest_long = pd.melt(df_gest_perf, id_vars=['Gestión de Origen'], value_vars=['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)'], var_name='Tipo de Avance', value_name='Porcentaje Promedio')
+                df_gest_long['Tipo de Avance'] = df_gest_long['Tipo de Avance'].replace({'Avance Financiero % (MEF)': 'Avance Financiero', 'Avance Físico % (INFOBRAS)': 'Avance Físico'})
                 
-                fig_bar_macro = px.bar(
-                    df_macro, x='Porcentaje Promedio', y='Indicador', orientation='h',
-                    color='Indicador', 
-                    color_discrete_map={'1. Plata Pagada (Avance Financiero %)': '#ef4444', '2. Construcción Real (Avance Físico %)': '#3b82f6'},
+                fig_gest_perf = px.bar(
+                    df_gest_long, x='Porcentaje Promedio', y='Gestión de Origen', color='Tipo de Avance', barmode='group', orientation='h',
+                    color_discrete_map={'Avance Financiero': '#ef4444', 'Avance Físico': '#3b82f6'},
                     text='Porcentaje Promedio'
                 )
-                fig_bar_macro.update_traces(
-                    texttemplate='<b>%{text:.1f}%</b>', 
-                    textposition='auto', 
-                    textfont_size=16, 
-                    textfont_color='white',
-                    hovertemplate='<b>%{y}</b><br>Promedio Nacional: %{x:.1f}%<extra></extra>'
+                fig_gest_perf.update_traces(texttemplate='<b>%{text:.1f}%</b>', textposition='outside')
+                fig_gest_perf.update_layout(
+                    xaxis=dict(range=[0, 115]),
+                    margin=dict(t=20, l=10, r=40, b=20),
+                    height=300,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None)
                 )
-                fig_bar_macro.update_layout(
-                    xaxis=dict(range=[0, max(100, max(avg_fin, avg_fis) + 10)]),
-                    margin=dict(t=20, l=10, r=20, b=20),
-                    height=250,
-                    showlegend=False
-                )
-                st.plotly_chart(fig_bar_macro, use_container_width=True, config={'displayModeBar': False})
-            else:
-                st.info("No hay datos suficientes para calcular los promedios.")
-            st.markdown('</div><br>', unsafe_allow_html=True)
+                st.plotly_chart(fig_gest_perf, use_container_width=True, config={'displayModeBar': False})
+                st.markdown('</div><br>', unsafe_allow_html=True)
             
             # Tabla Resumen de Sobrecostos e Irregularidades (Sin límites)
             st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Súper Tabla de Gastos vs Avance Físico</h4>', unsafe_allow_html=True)
