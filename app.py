@@ -556,6 +556,9 @@ with tab2:
         df_vs = conn.execute(vs_query).df()
         
         if not df_vs.empty:
+            df_vs['Desbalance'] = df_vs['Avance Financiero % (MEF)'] - df_vs['Avance Físico % (INFOBRAS)'].fillna(0)
+            df_vs['Estado'] = df_vs.apply(lambda r: "⚠️ PARALIZADA" if r['Paralizada']==1 else ("⚠️ DESFASE (Financiero > Físico)" if r['Desbalance']>30 else "✅ Normal"), axis=1)
+            
             def asignar_gestion(fecha):
                 try:
                     if pd.isna(fecha) or not str(fecha).strip(): return "Indeterminada"
