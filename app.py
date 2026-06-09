@@ -667,8 +667,23 @@ with tab2:
                 if isinstance(val, (int, float)) and val > 30: return 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;'
                 return ''
                 
+            def asignar_gestion(fecha):
+                try:
+                    if pd.isna(fecha) or not str(fecha).strip(): return "Indeterminada"
+                    año = int(str(fecha).split('/')[-1][:4])
+                    if año <= 2010: return "2007-2010 (Antigua)"
+                    elif 2011 <= año <= 2014: return "2011-2014"
+                    elif 2015 <= año <= 2018: return "2015-2018"
+                    elif 2019 <= año <= 2022: return "2019-2022"
+                    elif 2023 <= año <= 2026: return "2023-2026 (Actual)"
+                    else: return "Indeterminada"
+                except:
+                    return "Indeterminada"
+            
+            df_table['Gestión de Origen'] = df_table['Fecha Inicio (INFOBRAS)'].apply(asignar_gestion)
+                
             st.dataframe(
-                df_table[['CUI', 'Nombre', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
+                df_table[['CUI', 'Nombre', 'Gestión de Origen', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
                     "Costo Total (MEF)": "S/ {:,.0f}", "Devengado Histórico (MEF)": "S/ {:,.0f}", f"Gasto ({CURRENT_YEAR})": "S/ {:,.0f}", "Desbalance": "{:.1f}%", "Avance Financiero % (MEF)": "{:.1f}%", "Avance Físico % (INFOBRAS)": "{:.1f}%"
                 }), use_container_width=True, hide_index=True, height=500
             )
