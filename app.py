@@ -412,7 +412,7 @@ with tab1:
                 ELSE '4. Otros Gastos'
             END as Tipo_Gasto,
             SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as Presupuesto
-        FROM '{PARQUET_FILE}'
+        FROM '{DYNAMIC_PARQUET}'
         WHERE {where_clause}
         GROUP BY Tipo_Gasto
         ORDER BY Tipo_Gasto
@@ -424,6 +424,28 @@ with tab1:
         fig_pie.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
         fig_pie.update_traces(hovertemplate='<b>%{label}</b><br>Presupuesto: S/ %{value:,.0f}<extra></extra>')
         st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
+    st.markdown('</div><br>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="card-white"><h4 style="font-weight:bold; font-size:16px;">¿Qué tipo de bienes o servicios se compran? (Clasificación Genérica)</h4>', unsafe_allow_html=True)
+    generica_query = f"""
+        SELECT 
+            GENERICA_NOMBRE as Categoria,
+            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM
+        FROM '{DYNAMIC_PARQUET}'
+        WHERE {where_clause} AND GENERICA_NOMBRE IS NOT NULL
+        GROUP BY GENERICA_NOMBRE
+        ORDER BY PIM ASC
+    """
+    df_gen = conn.execute(generica_query).df()
+    if not df_gen.empty:
+        df_gen['Categoria'] = df_gen['Categoria'].str.replace('ADQUISICION DE ACTIVOS NO FINANCIEROS', 'Obras y Equipamiento (Construcción)')
+        df_gen['Categoria'] = df_gen['Categoria'].str.replace('BIENES Y SERVICIOS', 'Bienes, Servicios y Proyectos Sociales')
+        df_gen['Categoria'] = df_gen['Categoria'].str.replace('PERSONAL Y OBLIGACIONES SOCIALES', 'Pago de Personal (Planillas)')
+        
+        fig_gen = px.bar(df_gen, x='PIM', y='Categoria', orientation='h', text='PIM', color='PIM', color_continuous_scale='Teal')
+        fig_gen.update_traces(texttemplate='S/ %{text:,.0s}', textposition='outside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<extra></extra>')
+        fig_gen.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=350, coloraxis_showscale=False)
+        st.plotly_chart(fig_gen, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div><br>', unsafe_allow_html=True)
     
     st.markdown('<div class="card-white"><h4 style="font-weight:bold; font-size:16px;">🏛️ Cementerio Histórico (Infobras) vs Obras Activas (MEF)</h4>', unsafe_allow_html=True)
@@ -440,7 +462,7 @@ with tab1:
         SELECT 
             {group_col} as Agrupacion, 
             COUNT(DISTINCT PRODUCTO_PROYECTO) as "Activas (MEF 2026)"
-        FROM '{PARQUET_FILE}'
+        FROM '{DYNAMIC_PARQUET}'
         WHERE {where_clause} AND CATEGORIA_GASTO = 6 AND {group_col} IS NOT NULL
         GROUP BY {group_col}
         ORDER BY "Activas (MEF 2026)" DESC
@@ -508,10 +530,15 @@ with tab2:
                 TRY_CAST(s.MONTO_EJECUCION_TOTAL AS DOUBLE) as "Devengado Histórico (MEF)",
                 ROUND(COALESCE((TRY_CAST(s.MONTO_EJECUCION_TOTAL AS DOUBLE) / NULLIF(TRY_CAST(s.COSTO_ACTUAL AS DOUBLE), 0)) * 100, (m.Devengado / NULLIF(m.PIM, 0)) * 100, 0), 1) as "Avance Financiero % (MEF)",
                 ROUND(TRY_CAST(i.AVANCE_FISICO_INFOBRAS AS DOUBLE), 1) as "Avance Físico % (INFOBRAS)",
+                i.Fecha_de_inicio_de_obra as "Fecha Inicio (INFOBRAS)",
+                i.Fecha_finalizaci_n_programada_de_obra as "Fecha Fin Prog. (INFOBRAS)",
                 COALESCE(TRY_CAST(p.ES_PARALIZADA AS INTEGER), 0) as "Paralizada"
             FROM mef_data m
             LEFT JOIN (
-                SELECT CUI_INFOBRAS, MAX(TRY_CAST(AVANCE_FISICO_INFOBRAS AS DOUBLE)) as AVANCE_FISICO_INFOBRAS 
+                SELECT CUI_INFOBRAS, 
+                       MAX(TRY_CAST(AVANCE_FISICO_INFOBRAS AS DOUBLE)) as AVANCE_FISICO_INFOBRAS,
+                       MAX(Fecha_de_inicio_de_obra) as Fecha_de_inicio_de_obra,
+                       MAX(Fecha_finalizaci_n_programada_de_obra) as Fecha_finalizaci_n_programada_de_obra
                 FROM 'infobras_avance.parquet' 
                 GROUP BY 1
             ) i ON m.CUI = i.CUI_INFOBRAS
@@ -993,10 +1020,54 @@ with tab4:
                         st.error(f"No se pudo cargar el historial SSI. Detalle: {e}")
                         
                 # ---------------------------------------------------------
+                # SECCIÓN EVOLUCIÓN AVANCE FÍSICO (INFOBRAS)
+                # ---------------------------------------------------------
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#0f172a; font-weight:bold; font-size:18px;">V. EVOLUCIÓN HISTÓRICA DEL AVANCE FÍSICO (INFOBRAS)</h4>', unsafe_allow_html=True)
+                st.markdown('<div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 12px; margin-bottom: 15px; border-radius: 4px; font-size: 13.5px; color: #0f172a;">Observa cómo ha avanzado la construcción real de la obra mes a mes, comparando lo ejecutado frente a lo programado.</div>', unsafe_allow_html=True)
+                
+                if os.path.exists('infobras_avance.parquet'):
+                    curva_fis_query = f"""
+                        SELECT 
+                            CAST(A_o_de_avance AS INTEGER) as Ano,
+                            CAST(Mes_de_avance AS INTEGER) as Mes,
+                            MAX(TRY_CAST(AVANCE_FISICO_INFOBRAS AS DOUBLE)) as Avance_Real,
+                            MAX(TRY_CAST(Avance_F_sico_Programado_Acumulado____ AS DOUBLE)) as Avance_Programado
+                        FROM 'infobras_avance.parquet'
+                        WHERE CUI_INFOBRAS = '{cui_code}'
+                          AND A_o_de_avance IS NOT NULL 
+                          AND Mes_de_avance IS NOT NULL
+                        GROUP BY A_o_de_avance, Mes_de_avance
+                        ORDER BY Ano, Mes
+                    """
+                    try:
+                        df_curva_fis = conn.execute(curva_fis_query).df()
+                        if not df_curva_fis.empty:
+                            df_curva_fis['Fecha'] = df_curva_fis['Ano'].astype(str) + '-' + df_curva_fis['Mes'].astype(str).str.zfill(2)
+                            fig_fis = go.Figure()
+                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Programado'], mode='lines', name='Avance Programado %', line=dict(color='#94a3b8', width=2, dash='dash')))
+                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Real'], mode='lines+markers', name='Avance Real %', line=dict(color='#3b82f6', width=3)))
+                            
+                            fig_fis.update_layout(
+                                title='Curva de Avance Físico',
+                                yaxis_title="Porcentaje (%)",
+                                xaxis_title="Mes de Avance",
+                                hovermode="x unified",
+                                yaxis=dict(range=[0, 105]),
+                                margin=dict(l=20, r=20, t=40, b=20),
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                            )
+                            st.plotly_chart(fig_fis, use_container_width=True)
+                        else:
+                            st.info("No hay historial mensual de avance físico para esta obra en INFOBRAS.")
+                    except Exception as e:
+                        st.error(f"No se pudo cargar la curva de avance físico. Detalle: {e}")
+
+                # ---------------------------------------------------------
                 # SECCIÓN INFOBRAS (COMENTARIOS Y FECHAS)
                 # ---------------------------------------------------------
                 st.markdown("<br>", unsafe_allow_html=True)
-                st.markdown('<h4 style="color:#0f172a; font-weight:bold; font-size:18px;">V. EXPEDIENTE INFOBRAS (Reporte del Ingeniero)</h4>', unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#0f172a; font-weight:bold; font-size:18px;">VI. EXPEDIENTE INFOBRAS (Reporte del Ingeniero)</h4>', unsafe_allow_html=True)
                 st.markdown('<div style="background-color: #fefce8; border-left: 4px solid #eab308; padding: 12px; margin-bottom: 15px; border-radius: 4px; font-size: 13.5px; color: #0f172a;">Aquí puedes leer las justificaciones, comentarios y fechas reportadas por los ingenieros residentes y supervisores directamente en el sistema de la Contraloría.</div>', unsafe_allow_html=True)
                 
                 if os.path.exists('infobras_avance.parquet'):
