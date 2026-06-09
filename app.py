@@ -576,8 +576,10 @@ with tab2:
             def asignar_estado_plazo(fecha_fin):
                 try:
                     if pd.isna(fecha_fin) or not str(fecha_fin).strip(): return "Sin Cronograma"
-                    año_fin = int(str(fecha_fin).split('/')[-1][:4])
-                    if año_fin < int(CURRENT_YEAR): return "Plazo Vencido (Retraso/Liquidación)"
+                    fecha_fin_dt = pd.to_datetime(fecha_fin, format='%d/%m/%Y', errors='coerce')
+                    if pd.isna(fecha_fin_dt): return "Sin Cronograma"
+                    
+                    if fecha_fin_dt < pd.Timestamp.now(): return "Plazo Vencido (Retraso/Liquidación)"
                     else: return "En Plazo (Vigente)"
                 except:
                     return "Sin Cronograma"
