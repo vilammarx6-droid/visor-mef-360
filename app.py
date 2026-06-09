@@ -556,8 +556,29 @@ with tab2:
         df_vs = conn.execute(vs_query).df()
         
         if not df_vs.empty:
-            df_vs['Desbalance'] = df_vs['Avance Financiero % (MEF)'] - df_vs['Avance Físico % (INFOBRAS)'].fillna(0)
-            df_vs['Estado'] = df_vs.apply(lambda r: "⚠️ PARALIZADA" if r['Paralizada']==1 else ("⚠️ DESFASE (Financiero > Físico)" if r['Desbalance']>30 else "✅ Normal"), axis=1)
+            def asignar_gestion(fecha):
+                try:
+                    if pd.isna(fecha) or not str(fecha).strip(): return "Indeterminada"
+                    año = int(str(fecha).split('/')[-1][:4])
+                    if año <= 2010: return "2007-2010 (Antigua)"
+                    elif 2011 <= año <= 2014: return "2011-2014"
+                    elif 2015 <= año <= 2018: return "2015-2018"
+                    elif 2019 <= año <= 2022: return "2019-2022"
+                    elif 2023 <= año <= 2026: return "2023-2026 (Actual)"
+                    else: return "Indeterminada"
+                except:
+                    return "Indeterminada"
+            df_vs['Gestión de Origen'] = df_vs['Fecha Inicio (INFOBRAS)'].apply(asignar_gestion)
+            
+            def asignar_estado_plazo(fecha_fin):
+                try:
+                    if pd.isna(fecha_fin) or not str(fecha_fin).strip(): return "Sin Cronograma"
+                    año_fin = int(str(fecha_fin).split('/')[-1][:4])
+                    if año_fin < int(CURRENT_YEAR): return "Plazo Vencido (Retraso/Liquidación)"
+                    else: return "En Plazo (Vigente)"
+                except:
+                    return "Sin Cronograma"
+            df_vs['Estado del Plazo'] = df_vs['Fecha Fin Prog. (INFOBRAS)'].apply(asignar_estado_plazo)
             # RESUMEN EJECUTIVO (KPIs)
             total_obras = len(df_vs)
             obras_sin_reporte = int(df_vs['Avance Físico % (INFOBRAS)'].isna().sum())
@@ -633,18 +654,33 @@ with tab2:
                 • <strong>Desbalance (Brecha de Avance):</strong> <code>(Avance Financiero %) - (Avance Físico %)</code>. Mide la brecha exacta. Si a un contratista se le pagó el 80% del dinero, pero solo construyó el 20%, el desfase es +60%. Un desfase mayor a 30% activa automáticamente la alerta ⚠️ DESFASE.<br>
                 <span style="color:#0ea5e9; font-style:italic;">*Nota sobre números negativos: Si el desfase tiene un signo menos (Ej: -53.9%), significa matemáticamente que el Avance Físico es MAYOR que el Financiero. Esto tiene total sentido en la vida real: La obra ya está construida (100%), pero el Estado aún no le termina de pagar al contratista (46%) porque faltan liquidaciones o valorizaciones finales. Es un escenario financiero normal.*</span><br><br>
                 • <strong>Presupuesto con Alerta de Desfase (KPI Superior):</strong> Sumatoria total del Presupuesto (PIM) asignado este año exclusivamente a las obras etiquetadas como <em>Paralizadas</em> o <em>Con Desfase Crítico</em>.
+                
+                <hr>
+                <strong style="color:#ef4444;">🚨 ¿Por qué veo obras con Fecha Final en 2025 o antes, pero con presupuesto en 2026?</strong><br>
+                Esto genera mucha duda, pero es el escenario más común en la gestión pública peruana. Ocurre por 3 razones:
+                1. <strong>Retrasos Severos:</strong> La obra superó su plazo contractual, sigue construyéndose fuera de fecha, y el ingeniero residente aún no ha sincerado (registrado) la nueva "Fecha Final Reprogramada" en la Contraloría.
+                2. <strong>Liquidaciones y Deudas:</strong> La obra física ya terminó al 100% el año pasado, pero el Estado le sigue pagando al contratista retenciones de garantía, valorizaciones finales o deudas de arbitrajes en el año 2026.
+                3. <strong>Abandono:</strong> La obra está tirada, el plazo venció, y el municipio le asignó un pequeño presupuesto legal en 2026 solo para hacer peritajes o cierres administrativos.
                 </div>
                 """, unsafe_allow_html=True)
             
             # Filtro interactivo para la tabla basado en los KPIs
-            filtro_tabla = st.radio(
-                "🔍 **O puedes usar este selector para filtrar la tabla:**",
-                [f"🔵 Mostrar Todas las Obras ({total_obras})", 
-                 f"⚫ Mostrar SOLO Obras Paralizadas ({paralizadas})", 
-                 f"🔴 Mostrar SOLO Obras con Desfase Crítico ({criticas})"],
-                horizontal=True,
-                key="filtro_kpi_radio"
-            )
+            fc1, fc2, fc3 = st.columns([1, 1, 1])
+            with fc1:
+                filtro_tabla = st.radio(
+                    "🔍 **Filtro de Estado de la Obra:**",
+                    [f"🔵 Todas las Obras ({total_obras})", 
+                     f"⚫ SOLO Paralizadas ({paralizadas})", 
+                     f"🔴 SOLO con Desfase Crítico ({criticas})"],
+                    horizontal=True,
+                    key="filtro_kpi_radio"
+                )
+            with fc2:
+                lista_gestiones = ["Todas las Gestiones"] + sorted([g for g in df_vs['Gestión de Origen'].unique() if g != "Indeterminada"], reverse=True) + ["Indeterminada"]
+                filtro_gestion = st.selectbox("🏛️ **Filtro por Gestión (Origen):**", lista_gestiones)
+            with fc3:
+                lista_plazos = ["Todos los Plazos", "Plazo Vencido (Retraso/Liquidación)", "En Plazo (Vigente)", "Sin Cronograma"]
+                filtro_plazo = st.selectbox("⏳ **Filtro por Vigencia del Plazo:**", lista_plazos)
             
             df_table = df_vs.copy()
             if 'Gasto' in df_table.columns:
@@ -654,6 +690,12 @@ with tab2:
                 df_table = df_table[df_table['Paralizada'] == 1]
             elif "Desbalance" in filtro_tabla:
                 df_table = df_table[df_table['Desbalance'] > 30]
+                
+            if filtro_gestion != "Todas las Gestiones":
+                df_table = df_table[df_table['Gestión de Origen'] == filtro_gestion]
+                
+            if filtro_plazo != "Todos los Plazos":
+                df_table = df_table[df_table['Estado del Plazo'] == filtro_plazo]
                 
             df_table = df_table.sort_values(by="Desbalance", ascending=False)
             
@@ -667,23 +709,8 @@ with tab2:
                 if isinstance(val, (int, float)) and val > 30: return 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;'
                 return ''
                 
-            def asignar_gestion(fecha):
-                try:
-                    if pd.isna(fecha) or not str(fecha).strip(): return "Indeterminada"
-                    año = int(str(fecha).split('/')[-1][:4])
-                    if año <= 2010: return "2007-2010 (Antigua)"
-                    elif 2011 <= año <= 2014: return "2011-2014"
-                    elif 2015 <= año <= 2018: return "2015-2018"
-                    elif 2019 <= año <= 2022: return "2019-2022"
-                    elif 2023 <= año <= 2026: return "2023-2026 (Actual)"
-                    else: return "Indeterminada"
-                except:
-                    return "Indeterminada"
-            
-            df_table['Gestión de Origen'] = df_table['Fecha Inicio (INFOBRAS)'].apply(asignar_gestion)
-                
             st.dataframe(
-                df_table[['CUI', 'Nombre', 'Gestión de Origen', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
+                df_table[['CUI', 'Nombre', 'Gestión de Origen', 'Estado del Plazo', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
                     "Costo Total (MEF)": "S/ {:,.0f}", "Devengado Histórico (MEF)": "S/ {:,.0f}", f"Gasto ({CURRENT_YEAR})": "S/ {:,.0f}", "Desbalance": "{:.1f}%", "Avance Financiero % (MEF)": "{:.1f}%", "Avance Físico % (INFOBRAS)": "{:.1f}%"
                 }), use_container_width=True, hide_index=True, height=500
             )
