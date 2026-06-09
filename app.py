@@ -668,7 +668,7 @@ with tab2:
                 return ''
                 
             st.dataframe(
-                df_table[['CUI', 'Nombre', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance']].style.map(style_desbalance, subset=['Desbalance']).format({
+                df_table[['CUI', 'Nombre', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
                     "Costo Total (MEF)": "S/ {:,.0f}", "Devengado Histórico (MEF)": "S/ {:,.0f}", f"Gasto ({CURRENT_YEAR})": "S/ {:,.0f}", "Desbalance": "{:.1f}%", "Avance Financiero % (MEF)": "{:.1f}%", "Avance Físico % (INFOBRAS)": "{:.1f}%"
                 }), use_container_width=True, hide_index=True, height=500
             )
