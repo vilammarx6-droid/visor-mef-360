@@ -577,7 +577,7 @@ with tab2:
                 GROUP BY 1
             ) i ON m.CUI = i.CUI_INFOBRAS
             LEFT JOIN (
-                SELECT PRODUCTO_PROYECTO, MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as COSTO_ACTUAL, MAX(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as MONTO_EJECUCION_TOTAL 
+                SELECT PRODUCTO_PROYECTO, MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as COSTO_ACTUAL, SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as MONTO_EJECUCION_TOTAL 
                 FROM 'seguimiento_inversiones.parquet' 
                 GROUP BY 1
             ) s ON m.CUI = s.PRODUCTO_PROYECTO
@@ -1192,9 +1192,9 @@ with tab4:
                                     source = f"read_parquet('https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{path}')"
                                     
                                 if int(year) < 2024:
-                                    q = f"SELECT '{year}' as Año, NULL as Costo_Actual, MAX(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as Ejecucion_Total FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' GROUP BY PRODUCTO_PROYECTO"
+                                    q = f"SELECT '{year}' as Año, NULL as Costo_Actual, SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as Ejecucion_Total FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' GROUP BY PRODUCTO_PROYECTO"
                                 else:
-                                    q = f"SELECT '{year}' as Año, MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as Costo_Actual, MAX(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as Ejecucion_Total FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' GROUP BY PRODUCTO_PROYECTO"
+                                    q = f"SELECT '{year}' as Año, MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as Costo_Actual, SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as Ejecucion_Total FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' GROUP BY PRODUCTO_PROYECTO"
                                 ssi_query_parts.append(q)
                         
                         if ssi_query_parts:
