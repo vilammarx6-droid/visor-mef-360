@@ -622,17 +622,15 @@ with tab2:
                 """, unsafe_allow_html=True)
             
             # 2. UI de Filtros Interactivos (Arriba de los gráficos)
-            st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Filtros de Auditoría Ciudadana</h4>', unsafe_allow_html=True)
-            fc1, fc2, fc3, fc4 = st.columns([1, 1, 1, 1])
+            st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:10px; margin-bottom: 15px;">Filtros de Auditoría Ciudadana</h4>', unsafe_allow_html=True)
+            fc1, fc2, fc3, fc4 = st.columns(4)
             with fc1:
-                filtro_tabla = st.radio(
-                    "🔍 **Estado de la Obra:**",
-                    [f"🔵 Todas ({len(df_vs)})", 
+                opciones_estado = [
+                     f"🔵 Todas ({len(df_vs)})", 
                      f"⚫ Paralizadas ({int(df_vs['Paralizada'].sum())})", 
-                     f"🔴 Desfase ({len(df_vs[df_vs['Desbalance'] > 30])})"],
-                    horizontal=True,
-                    key="filtro_kpi_radio"
-                )
+                     f"🔴 Desfase Crítico ({len(df_vs[df_vs['Desbalance'] > 30])})"
+                ]
+                filtro_tabla = st.selectbox("🔍 **Estado de la Obra:**", opciones_estado)
             with fc2:
                 lista_gestiones = ["Todas las Gestiones"] + sorted([g for g in df_vs['Gestión de Origen'].unique() if g != "Indeterminada"], reverse=True) + ["Indeterminada"]
                 filtro_gestion = st.selectbox("🏛️ **Gestión (Origen):**", lista_gestiones)
@@ -672,7 +670,12 @@ with tab2:
             obras_vencidas_f = len(df_filtered[df_filtered['Estado del Plazo'] == 'Plazo Vencido (Retraso/Liquidación)'])
             dinero_vencido_f = df_filtered[df_filtered['Estado del Plazo'] == 'Plazo Vencido (Retraso/Liquidación)']['PIM'].sum()
             
-            st.markdown(f'<p style="font-size:14px; font-weight:600; color:#3b82f6;">Total de Obras Analizadas en esta vista: {total_obras_f}</p>', unsafe_allow_html=True)
+            st.markdown(f'''
+            <div style="background-color: #f8fafc; padding: 10px 15px; border-radius: 6px; border-left: 4px solid #3b82f6; margin-bottom: 20px; display: inline-block; border: 1px solid #e2e8f0; border-left-width: 4px;">
+                <span style="font-size:14px; font-weight:600; color:#475569;">Total de Obras Analizadas en esta vista:</span> 
+                <span style="font-size:15px; font-weight:800; color:#0f172a; margin-left: 5px;">{total_obras_f}</span>
+            </div>
+            ''', unsafe_allow_html=True)
             
             sc1, sc2, sc3 = st.columns(3)
             with sc1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #000;"><div class="kpi-title">Obras Paralizadas (INFOBRAS)</div><div class="kpi-value" style="color:#000;">{paralizadas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras oficialmente reportadas como detenidas en la Contraloría.</div></div>', unsafe_allow_html=True)
