@@ -671,20 +671,27 @@ with tab2:
             dinero_vencido_f = df_filtered[df_filtered['Estado del Plazo'] == 'Plazo Vencido (Retraso/Liquidación)']['PIM'].sum()
             
             st.markdown(f'''
-            <div style="background-color: #f8fafc; padding: 10px 15px; border-radius: 6px; border-left: 4px solid #3b82f6; margin-bottom: 20px; display: inline-block; border: 1px solid #e2e8f0; border-left-width: 4px;">
+            <div style="background-color: #f8fafc; padding: 10px 15px; border-radius: 6px; border-left: 4px solid #3b82f6; margin-bottom: 25px; display: inline-block; border: 1px solid #e2e8f0; border-left-width: 4px;">
                 <span style="font-size:14px; font-weight:600; color:#475569;">Total de Obras Analizadas en esta vista:</span> 
                 <span style="font-size:15px; font-weight:800; color:#0f172a; margin-left: 5px;">{total_obras_f}</span>
             </div>
             ''', unsafe_allow_html=True)
             
+            # FILA 1: CONTEO DE OBRAS (3 Tarjetas)
+            st.markdown('<h5 style="color:#334155; margin-bottom: 12px; font-size:15px; font-weight:800;">📉 Alertas Críticas (Cantidad de Proyectos)</h5>', unsafe_allow_html=True)
             sc1, sc2, sc3 = st.columns(3)
             with sc1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #000;"><div class="kpi-title">Obras Paralizadas (INFOBRAS)</div><div class="kpi-value" style="color:#000;">{paralizadas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras oficialmente reportadas como detenidas en la Contraloría.</div></div>', unsafe_allow_html=True)
             with sc2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #ef4444;"><div class="kpi-title">Obras con Desfase Crítico</div><div class="kpi-value" style="color:#ef4444;">{criticas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Brecha entre avance financiero y físico > 30%.</div></div>', unsafe_allow_html=True)
-            with sc3: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #f59e0b;"><div class="kpi-title">Dinero en Riesgo (Desfase)</div><div class="kpi-value" style="color:#f59e0b;">S/ {dinero_riesgo_f/1e6:,.1f} M</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Presupuesto ({CURRENT_YEAR}) de obras paralizadas o con gran desfase.</div></div>', unsafe_allow_html=True)
-            st.markdown("<br>", unsafe_allow_html=True)
+            with sc3: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Obras "Fantasmas" (Plazo Vencido)</div><div class="kpi-value" style="color:#8b5cf6;">{obras_vencidas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras que debieron terminar en 2025 o antes, pero siguen activas.</div></div>', unsafe_allow_html=True)
             
+            st.markdown('''<div style="font-size: 12px; color: #64748b; margin-top: 5px; margin-bottom: 25px; font-style: italic;">
+                *Nota: La suma de estas tres alertas puede ser mayor al total de obras analizadas porque un mismo proyecto puede sufrir múltiples problemas a la vez (ej. estar Paralizada y con Plazo Vencido simultáneamente).
+            </div>''', unsafe_allow_html=True)
+            
+            # FILA 2: DINERO EN RIESGO (2 Tarjetas)
+            st.markdown('<h5 style="color:#334155; margin-bottom: 12px; font-size:15px; font-weight:800;">💰 Impacto Financiero en el Presupuesto Actual</h5>', unsafe_allow_html=True)
             sc_ghost1, sc_ghost2 = st.columns(2)
-            with sc_ghost1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Obras "Fantasmas" (Plazo Vencido)</div><div class="kpi-value" style="color:#8b5cf6;">{obras_vencidas_f}</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Obras que debieron terminar en 2025 o antes, pero siguen activas en el presupuesto.</div></div>', unsafe_allow_html=True)
+            with sc_ghost1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #f59e0b;"><div class="kpi-title">Dinero en Riesgo (Desfase y Paralización)</div><div class="kpi-value" style="color:#f59e0b;">S/ {dinero_riesgo_f/1e6:,.1f} M</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Presupuesto ({CURRENT_YEAR}) comprometido en obras detenidas o con grave desfase.</div></div>', unsafe_allow_html=True)
             with sc_ghost2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Presupuesto Absorbido (Obras Vencidas)</div><div class="kpi-value" style="color:#8b5cf6;">S/ {dinero_vencido_f/1e6:,.1f} M</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Dinero que siguen "chupando" hoy las obras que legalmente ya debieron entregarse.</div></div>', unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
             
