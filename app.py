@@ -575,8 +575,14 @@ with tab2:
             ent_name_raw = str(f_sec_eje).split(":")[1].strip()
             ent_name = ent_name_raw.split("-")[0].strip() # 'MUNICIPALIDAD PROVINCIAL DE CHUMBIVILCAS'
             ent_name = ent_name.replace("'", "''")
+        infobras_conditions = []
+        if ent_name:
+            infobras_conditions.append(f"Entidad_P_blica = '{ent_name}'")
+        if f_search.strip():
+            search_term_ib = f_search.strip().upper()
+            infobras_conditions.append(f"(CAST(TRY_CAST(CUI_INFOBRAS AS BIGINT) AS VARCHAR) LIKE '%{search_term_ib}%' OR UPPER(Nombre_de_obra) LIKE '%{search_term_ib}%')")
             
-        infobras_filter = f"WHERE Entidad_P_blica = '{ent_name}'" if ent_name else ""
+        infobras_filter = "WHERE " + " AND ".join(infobras_conditions) if infobras_conditions else ""
         join_type = "FULL OUTER JOIN" if ent_name else "LEFT JOIN"
 
         vs_query = f"""
