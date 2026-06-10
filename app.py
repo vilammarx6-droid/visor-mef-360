@@ -576,11 +576,13 @@ with tab2:
             ent_name = ent_name_raw.split("-")[0].strip() # 'MUNICIPALIDAD PROVINCIAL DE CHUMBIVILCAS'
             ent_name = ent_name.replace("'", "''")
         infobras_conditions = []
+        ssi_search_filter = ""
         if ent_name:
             infobras_conditions.append(f"Entidad_P_blica = '{ent_name}'")
         if f_search.strip():
             search_term_ib = f_search.strip().upper()
             infobras_conditions.append(f"(CAST(TRY_CAST(CUI_INFOBRAS AS BIGINT) AS VARCHAR) LIKE '%{search_term_ib}%' OR UPPER(Nombre_de_obra) LIKE '%{search_term_ib}%')")
+            ssi_search_filter = f"AND (CAST(PRODUCTO_PROYECTO AS VARCHAR) LIKE '%{search_term_ib}%' OR UPPER(PRODUCTO_PROYECTO_NOMBRE) LIKE '%{search_term_ib}%')"
             
         infobras_filter = "WHERE " + " AND ".join(infobras_conditions) if infobras_conditions else ""
         join_type = "FULL OUTER JOIN" if ent_name else "LEFT JOIN"
@@ -593,6 +595,7 @@ with tab2:
                 FROM 'seguimiento_inversiones.parquet'
                 WHERE CAST(SEC_EJEC AS VARCHAR) IN (SELECT DISTINCT CAST(SEC_EJEC AS VARCHAR) FROM '{PARQUET_FILE}' WHERE {where_clause})
                 AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
+                {ssi_search_filter}
                 GROUP BY PRODUCTO_PROYECTO
             ),
             mef_current AS (
