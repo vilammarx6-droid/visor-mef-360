@@ -592,7 +592,8 @@ with tab2:
             WITH ssi AS (
                 SELECT CAST(PRODUCTO_PROYECTO AS VARCHAR) as CUI, MAX(PRODUCTO_PROYECTO_NOMBRE) as Nombre,
                        MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as COSTO_ACTUAL,
-                       SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as MONTO_EJECUCION_TOTAL
+                       SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as MONTO_EJECUCION_TOTAL,
+                       MAX(TRY_CAST(Anio_Inicio_MEF AS INTEGER)) as Anio_Inicio_MEF
                 FROM 'seguimiento_inversiones.parquet'
                 WHERE CAST(SEC_EJEC AS VARCHAR) IN (SELECT DISTINCT CAST(SEC_EJEC AS VARCHAR) FROM '{PARQUET_FILE}' WHERE {where_clause})
                 AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
@@ -631,6 +632,11 @@ with tab2:
             SELECT 
                 COALESCE(s.CUI, i.CUI_INFOBRAS) as CUI, 
                 COALESCE(s.Nombre, i.Nombre_INFOBRAS) as Nombre, 
+                CASE 
+                    WHEN s.CUI IS NOT NULL AND i.CUI_INFOBRAS IS NOT NULL THEN 'Ambos'
+                    WHEN s.CUI IS NOT NULL THEN 'Solo MEF'
+                    ELSE 'Solo INFOBRAS'
+                END as Origen_Dato,
                 COALESCE(i.Estado_INFOBRAS, 'Sin Registro') as "Estado (INFOBRAS)",
                 COALESCE(m.PIA, 0) as PIA, 
                 COALESCE(m.PIM, 0) as PIM, 
@@ -642,6 +648,7 @@ with tab2:
                 ROUND(COALESCE((s.MONTO_EJECUCION_TOTAL / NULLIF(s.COSTO_ACTUAL, 0)) * 100, 0), 1) as "Avance Financiero % (MEF)",
                 ROUND(TRY_CAST(i.AVANCE_FISICO_INFOBRAS AS DOUBLE), 1) as "Avance Físico % (INFOBRAS)",
                 i.Fecha_de_inicio_de_obra as "Fecha Inicio (INFOBRAS)",
+                s.Anio_Inicio_MEF,
                 i.Fecha_finalizaci_n_programada_de_obra as "Fecha Fin Prog. (INFOBRAS)",
                 COALESCE(i.Tiene_Liquidacion, 'No') as "Liquidada",
                 i.Fecha_Liquidacion as "Fecha Liquidación",
@@ -658,19 +665,32 @@ with tab2:
             df_vs['Desbalance'] = df_vs['Avance Financiero % (MEF)'] - df_vs['Avance Físico % (INFOBRAS)'].fillna(0)
             df_vs['Estado'] = df_vs.apply(lambda r: "⚠️ PARALIZADA" if r['Paralizada']==1 else ("⚠️ DESFASE (Financiero > Físico)" if r['Desbalance']>30 else "✅ Normal"), axis=1)
             
-            def asignar_gestion(fecha):
+            def asignar_gestion(row):
                 try:
-                    if pd.isna(fecha) or not str(fecha).strip(): return "Indeterminada"
-                    año = int(str(fecha).split('/')[-1][:4])
+                    fecha = row['Fecha Inicio (INFOBRAS)']
+                    año = 0
+                    
+                    if not pd.isna(fecha) and str(fecha).strip():
+                        fecha_str = str(fecha).strip()
+                        if '0001' not in fecha_str and '1900' not in fecha_str:
+                            año_infobras = int(fecha_str.split('/')[-1][:4])
+                            if año_infobras >= 2000:
+                                año = año_infobras
+                    
+                    if año == 0 and not pd.isna(row['Anio_Inicio_MEF']):
+                        año = int(row['Anio_Inicio_MEF'])
+                        
+                    if año == 0: return "Sin Fecha Reportada"
+                    
                     if año <= 2010: return "2007-2010 (Antigua)"
                     elif 2011 <= año <= 2014: return "2011-2014"
                     elif 2015 <= año <= 2018: return "2015-2018"
                     elif 2019 <= año <= 2022: return "2019-2022"
                     elif 2023 <= año <= 2026: return "2023-2026 (Actual)"
-                    else: return "Indeterminada"
+                    else: return "Sin Fecha Reportada"
                 except:
-                    return "Indeterminada"
-            df_vs['Gestión de Origen'] = df_vs['Fecha Inicio (INFOBRAS)'].apply(asignar_gestion)
+                    return "Sin Fecha Reportada"
+            df_vs['Gestión de Origen'] = df_vs.apply(asignar_gestion, axis=1)
             
             def asignar_estado_plazo(fecha_fin):
                 try:
@@ -719,9 +739,9 @@ with tab2:
             with fc2:
                 gestiones_counts = df_vs['Gestión de Origen'].value_counts()
                 lista_gestiones = [f"Todas las Gestiones ({len(df_vs)})"]
-                for g in sorted([g for g in df_vs['Gestión de Origen'].unique() if g != "Indeterminada"], reverse=True):
+                for g in sorted([g for g in df_vs['Gestión de Origen'].unique() if g != "Sin Fecha Reportada"], reverse=True):
                     lista_gestiones.append(f"{g} ({gestiones_counts.get(g, 0)})")
-                lista_gestiones.append(f"Indeterminada ({gestiones_counts.get('Indeterminada', 0)})")
+                lista_gestiones.append(f"Sin Fecha Reportada ({gestiones_counts.get('Sin Fecha Reportada', 0)})")
                 filtro_gestion_raw = st.selectbox("🏛️ **Gestión (Origen):**", lista_gestiones)
                 filtro_gestion = filtro_gestion_raw.split(" (")[0]
             with fc3:
@@ -764,6 +784,12 @@ with tab2:
                 
             # 4. Calcular KPIs basados en el DF filtrado
             total_obras_f = len(df_filtered)
+            obras_mef = len(df_filtered[df_filtered['Origen_Dato'].isin(['Solo MEF', 'Ambos'])])
+            obras_infobras = len(df_filtered[df_filtered['Origen_Dato'].isin(['Solo INFOBRAS', 'Ambos'])])
+            obras_ambos = len(df_filtered[df_filtered['Origen_Dato'] == 'Ambos'])
+            obras_solo_mef = len(df_filtered[df_filtered['Origen_Dato'] == 'Solo MEF'])
+            obras_solo_ib = len(df_filtered[df_filtered['Origen_Dato'] == 'Solo INFOBRAS'])
+            
             paralizadas_f = int(df_filtered['Paralizada'].sum())
             criticas_f = len(df_filtered[df_filtered['Desbalance'] > 30])
             dinero_riesgo_f = df_filtered[(df_filtered['Paralizada'] == 1) | (df_filtered['Desbalance'] > 30)]['PIM'].sum()
@@ -771,9 +797,35 @@ with tab2:
             dinero_vencido_f = df_filtered[df_filtered['Estado del Plazo'] == 'Plazo Vencido (Retraso/Liquidación)']['PIM'].sum()
             
             st.markdown(f'''
-            <div style="background-color: #f8fafc; padding: 10px 15px; border-radius: 6px; border-left: 4px solid #3b82f6; margin-bottom: 25px; display: inline-block; border: 1px solid #e2e8f0; border-left-width: 4px;">
-                <span style="font-size:14px; font-weight:600; color:#475569;">Total de Obras Analizadas en esta vista:</span> 
-                <span style="font-size:15px; font-weight:800; color:#0f172a; margin-left: 5px;">{total_obras_f}</span>
+            <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #3b82f6; margin-bottom: 25px; border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
+                <div style="font-size:15px; font-weight:800; color:#0f172a; margin-bottom: 8px;">📊 Universo Consolidado: Origen de los Datos</div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div style="flex: 1 1 auto; min-width: 120px; background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        <div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">1. Universo MEF</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #3b82f6;">{obras_mef}</div>
+                    </div>
+                    <div style="flex: 1 1 auto; min-width: 120px; background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        <div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">2. Univ. INFOBRAS</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #ec4899;">{obras_infobras}</div>
+                    </div>
+                    <div style="flex: 1 1 auto; min-width: 120px; background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        <div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">A. Existen en Ambos</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #10b981;">{obras_ambos}</div>
+                    </div>
+                    <div style="flex: 1 1 auto; min-width: 120px; background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        <div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">B. Ocultas (Solo MEF)</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #f59e0b;">{obras_solo_mef}</div>
+                    </div>
+                    <div style="flex: 1 1 auto; min-width: 120px; background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                        <div style="font-size: 11px; color: #64748b; font-weight: 600; text-transform: uppercase;">C. Solo Infobras</div>
+                        <div style="font-size: 18px; font-weight: 800; color: #64748b;">{obras_solo_ib}</div>
+                    </div>
+                    <div style="flex: 1 1 auto; min-width: 120px; background: #ffffff; padding: 8px 12px; border-radius: 6px; border: 2px solid #0f172a; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <div style="font-size: 11px; color: #0f172a; font-weight: 700; text-transform: uppercase;">FUSIÓN FINAL (TOTAL)</div>
+                        <div style="font-size: 20px; font-weight: 900; color: #0f172a;">{total_obras_f}</div>
+                    </div>
+                </div>
+                <div style="font-size: 12px; color: #475569; margin-top: 10px;"><i>* Fusión Matemática: (Universo MEF) + (Univ. INFOBRAS) - (Existen en Ambos) = TOTAL OBRAS ANALIZADAS.</i></div>
             </div>
             ''', unsafe_allow_html=True)
             
@@ -876,9 +928,10 @@ with tab2:
                 st.markdown('<h4 style="font-weight:bold; font-size:16px; color:#0f172a; margin-top:20px;">⚖️ Desempeño Real por Gestión (Construcción Real vs Plata Pagada)</h4>', unsafe_allow_html=True)
                 st.markdown('<p style="font-size:13px; color:#64748b; margin-bottom:15px;">Mide la verdadera eficacia: suma todo el presupuesto manejado por una gestión y compara qué porcentaje de la plata ya salió del banco vs qué porcentaje está realmente construido (en fierro y cemento).</p>', unsafe_allow_html=True)
                 
-                df_gest_perf_data = df_filtered.copy()
-                df_gest_perf_data['Avance Físico % (INFOBRAS)'] = df_gest_perf_data['Avance Físico % (INFOBRAS)'].fillna(0)
-                df_gest_perf_data['Costo_Ponderado'] = df_gest_perf_data['Costo Total (MEF)'].fillna(df_gest_perf_data['PIM'])
+                df_gest_perf_data = df_filtered[df_filtered['Gestión de Origen'] != 'Sin Fecha Reportada'].copy()
+                if not df_gest_perf_data.empty:
+                    df_gest_perf_data['Avance Físico % (INFOBRAS)'] = df_gest_perf_data['Avance Físico % (INFOBRAS)'].fillna(0)
+                    df_gest_perf_data['Costo_Ponderado'] = df_gest_perf_data['Costo Total (MEF)'].fillna(df_gest_perf_data['PIM'])
                 df_gest_perf_data['Fisico_Ponderado'] = df_gest_perf_data['Avance Físico % (INFOBRAS)'] * df_gest_perf_data['Costo_Ponderado']
                 
                 df_gest_perf = df_gest_perf_data.groupby('Gestión de Origen').agg(
@@ -922,9 +975,11 @@ with tab2:
 </div>
 </div>
 </div>"""
-                
-                html_gest_perf += "</div></div>"
-                st.markdown(html_gest_perf, unsafe_allow_html=True)
+                    
+                    html_gest_perf += '</div></div><div style="font-size: 12px; color: #64748b; margin-top: 5px;"><i>* Nota: Las obras "Sin Fecha Reportada" (por falta de datos en Infobras o por ser exclusivas del MEF) han sido excluidas de esta tabla comparativa para no sesgar los promedios de cada alcalde.</i></div>'
+                    st.markdown(html_gest_perf, unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="card-white" style="margin-bottom: 20px;"><span style="color:#64748b;">No hay datos suficientes con fechas de inicio válidas para calcular el desempeño por gestión.</span></div>', unsafe_allow_html=True)
             
             # 7. Tabla Resumen de Sobrecostos e Irregularidades
             st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Súper Tabla de Gastos vs Avance Físico</h4>', unsafe_allow_html=True)
