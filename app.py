@@ -232,7 +232,6 @@ else:
 # ==========================================
 # TABS PRINCIPALES
 # ==========================================
-st.markdown('<div class="card-white" style="padding:0; padding-top:10px;">', unsafe_allow_html=True)
 tab1, tab2, tab3, tab4 = st.tabs(["📊 Radiografía del Gasto", "⚖️ VERSUS: Físico vs Financiero (Obras)", "📋 Todas las Obras (SNIP)", "🔎 Detalle por Obra"])
 
 # ---------------------------------------------------------
@@ -339,7 +338,6 @@ with tab1:
     st.markdown("<br>", unsafe_allow_html=True)
     
     st.markdown('### 📊 Origen y Destino de los Fondos')
-    st.markdown('<div class="card-white">', unsafe_allow_html=True)
     col_orig, col_dest = st.columns(2)
     
     with col_orig:
@@ -386,7 +384,7 @@ with tab1:
             fig_funcion.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_colorbar=dict(title="% Avance"))
             st.plotly_chart(fig_funcion, use_container_width=True, config={'displayModeBar': False})
             
-    st.markdown('</div><br>', unsafe_allow_html=True)
+    st.markdown('<br>', unsafe_allow_html=True)
     
     curva_query = f"""
         SELECT CAST(MES_EJE AS INTEGER) as Mes_Num, SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado
@@ -415,7 +413,7 @@ with tab1:
         st.plotly_chart(fig_line, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div><br>', unsafe_allow_html=True)
 
-    st.markdown('<div class="card-white"><h4 style="font-weight:bold; font-size:16px;">¿En qué se gasta el dinero? (Obras vs Planillas)</h4>', unsafe_allow_html=True)
+    st.markdown('<h4 style="font-weight:bold; font-size:16px;">¿En qué se gasta el dinero? (Obras vs Planillas)</h4>', unsafe_allow_html=True)
     pie_query = f"""
         SELECT 
             CASE 
@@ -439,7 +437,7 @@ with tab1:
         st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div><br>', unsafe_allow_html=True)
     
-    st.markdown('<div class="card-white"><h4 style="font-weight:bold; font-size:16px;">¿Qué tipo de bienes o servicios se compran? (Clasificación Genérica)</h4>', unsafe_allow_html=True)
+    st.markdown('<h4 style="font-weight:bold; font-size:16px;">¿Qué tipo de bienes o servicios se compran? (Clasificación Genérica)</h4>', unsafe_allow_html=True)
     generica_query = f"""
         SELECT 
             GENERICA_NOMBRE as Categoria,
@@ -461,7 +459,7 @@ with tab1:
         st.plotly_chart(fig_gen, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div><br>', unsafe_allow_html=True)
     
-    st.markdown('<div class="card-white"><h4 style="font-weight:bold; font-size:16px;">🏛️ Cementerio Histórico (Infobras) vs Obras Activas (MEF)</h4>', unsafe_allow_html=True)
+    st.markdown('<h4 style="font-weight:bold; font-size:16px;">🏛️ Cementerio Histórico (Infobras) vs Obras Activas (MEF)</h4>', unsafe_allow_html=True)
     st.markdown('<p style="font-size:13px; color:#64748b;">Compara el total histórico de obras registradas en Contraloría a lo largo de los años, frente a las obras que realmente tienen presupuesto activo en 2026.</p>', unsafe_allow_html=True)
     
     if f_sec_eje != "TODOS" or f_pliego != "TODOS":
@@ -512,7 +510,6 @@ with tab1:
     except Exception as e:
         pass
         
-    st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------
@@ -770,7 +767,7 @@ with tab2:
             
             # 6. Desempeño Promedio por Gestión
             if not df_filtered.empty:
-                st.markdown('<div class="card-white" style="margin-top:10px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">⚖️ Desempeño Promedio por Gestión (Avance Físico vs Avance Financiero)</h4>', unsafe_allow_html=True)
+                st.markdown('<h4 style="font-weight:bold; font-size:16px; color:#0f172a; margin-top:20px;">⚖️ Desempeño Promedio por Gestión (Avance Físico vs Avance Financiero)</h4>', unsafe_allow_html=True)
                 
                 df_gest_perf = df_filtered.groupby('Gestión de Origen')[['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)']].mean().reset_index()
                 df_gest_perf = df_gest_perf.sort_values(by="Gestión de Origen", ascending=False)
@@ -1318,4 +1315,4 @@ with tab4:
             else:
                 st.warning("La obra seleccionada no registra movimientos financieros en este año.")
 
-st.markdown('</div>', unsafe_allow_html=True)
+# End of app
