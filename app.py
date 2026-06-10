@@ -273,10 +273,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-# ==========================================
-# TABS PRINCIPALES
-# ==========================================
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Radiografía del Gasto", "⚖️ VERSUS: Físico vs Financiero (Obras)", "📋 Todas las Obras (SNIP)", "🔎 Detalle por Obra"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Radiografía del Gasto", "⚖️ VERSUS: Físico vs Financiero (Obras)", "📋 Todas las Obras (SNIP)", "🔎 Detalle por Obra", "🏛️ Auditoría de Gestiones"])
 
 # ---------------------------------------------------------
 # TAB 1: RADIOGRAFÍA DEL GASTO (Obras vs Burocracia)
@@ -1502,5 +1499,110 @@ with tab4:
 
             else:
                 st.warning("La obra seleccionada no registra movimientos financieros en este año.")
+
+# ---------------------------------------------------------
+# TAB 5: AUDITORÍA HISTÓRICA DE GESTIONES
+# ---------------------------------------------------------
+with tab5:
+    st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
+    st.markdown('<h2 style="color:#0f172a; font-weight:900;">🏛️ Auditoría Histórica de Obras por Gestión</h2>', unsafe_allow_html=True)
+    st.markdown('<p style="color:#475569;">Esta pestaña evalúa el desempeño de los alcaldes (históricos vs. actual) basándose en la creación, liquidación y abandono de obras.</p>', unsafe_allow_html=True)
+    
+    if 'df_vs' in locals() and not df_vs.empty:
+        # 1. Preparar Datos
+        df_audit = df_vs.copy()
+        
+        # Clasificar obras de la Gestión Actual
+        df_audit['Es_Gestion_Actual'] = df_audit['Gestión de Origen'] == '2023-2026 (Actual)'
+        
+        # Obras liquidadas en la gestión actual
+        # Asumimos que si la fecha de liquidación contiene 2023, 2024, 2025 o 2026, la liquidó la gestión actual.
+        def liquidada_por_actual(row):
+            if row['Liquidada'] == 'Si' and pd.notna(row['Fecha Liquidación']):
+                fecha_str = str(row['Fecha Liquidación'])
+                if any(year in fecha_str for year in ['2023', '2024', '2025', '2026']):
+                    return True
+            return False
+        
+        df_audit['Liquidada_Por_Actual'] = df_audit.apply(liquidada_por_actual, axis=1)
+        
+        # Obras Heredadas Abandonadas
+        def es_abandonada(row):
+            # Es heredada
+            if row['Gestión de Origen'] not in ['2023-2026 (Actual)', 'Sin Fecha Reportada']:
+                # No está liquidada
+                if row['Liquidada'] != 'Si':
+                    # Está paralizada explícitamente O tiene poco avance físico (ej. < 100 y Estado Paralizada)
+                    estado = str(row.get('Estado (INFOBRAS)', '')).upper()
+                    if row['Paralizada'] == 1 or 'PARALIZADA' in estado or 'SIN EJECUCI' in estado or 'SIN REGISTRO' in estado:
+                        return True
+            return False
+            
+        df_audit['Heredada_Abandonada'] = df_audit.apply(es_abandonada, axis=1)
+        
+        # 2. Métricas
+        total_historico = len(df_audit)
+        total_liquidadas = len(df_audit[df_audit['Liquidada'] == 'Si'])
+        obras_actual = len(df_audit[df_audit['Es_Gestion_Actual']])
+        liquidadas_actual = len(df_audit[df_audit['Liquidada_Por_Actual']])
+        abandonadas = len(df_audit[df_audit['Heredada_Abandonada']])
+        
+        # Render Metrics
+        st.markdown('<h4 style="color:#0f172a; margin-top:20px;">📊 Resumen General (Todo el Historial)</h4>', unsafe_allow_html=True)
+        col1, col2, col3, col4, col5 = st.columns(5)
+        
+        def render_audit_metric(title, value, color="#3b82f6", bg="#eff6ff"):
+            st.markdown(f"""
+            <div style="background-color: {bg}; border: 1px solid {color}; border-radius: 8px; padding: 15px; text-align: center; height: 100%;">
+                <p style="margin:0; font-size:13px; color:#475569; font-weight:bold; line-height:1.2;">{title}</p>
+                <h2 style="margin:0; margin-top:10px; font-size:28px; color:{color}; font-weight:900;">{value}</h2>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        with col1: render_audit_metric("Total Proyectos (Historia)", total_historico, "#64748b", "#f8fafc")
+        with col2: render_audit_metric("Total Liquidadas (Historia)", total_liquidadas, "#10b981", "#ecfdf5")
+        with col3: render_audit_metric("Nuevas Obras (Gestión 23-26)", obras_actual, "#3b82f6", "#eff6ff")
+        with col4: render_audit_metric("Liquidadas por Gestión 23-26", liquidadas_actual, "#8b5cf6", "#f5f3ff")
+        with col5: render_audit_metric("Heredadas y Abandonadas", abandonadas, "#ef4444", "#fef2f2")
+        
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # 3. Vista Detallada Interactiva
+        st.markdown('<div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px;">', unsafe_allow_html=True)
+        st.markdown('**🔍 Explorar Detalles:** Seleccione un grupo para ver la lista exacta de obras con sus montos y fechas.', unsafe_allow_html=True)
+        
+        vista_seleccionada = st.radio(
+            "Filtrar tabla de auditoría:",
+            ["Mostrar TODAS", "Nuevas Obras (Gestión 23-26)", "Liquidadas por Gestión Actual", "Heredadas Abandonadas", "Todas las Liquidadas Históricas"],
+            horizontal=True
+        )
+        
+        if vista_seleccionada == "Nuevas Obras (Gestión 23-26)":
+            df_mostrar = df_audit[df_audit['Es_Gestion_Actual']]
+        elif vista_seleccionada == "Liquidadas por Gestión Actual":
+            df_mostrar = df_audit[df_audit['Liquidada_Por_Actual']]
+        elif vista_seleccionada == "Heredadas Abandonadas":
+            df_mostrar = df_audit[df_audit['Heredada_Abandonada']]
+        elif vista_seleccionada == "Todas las Liquidadas Históricas":
+            df_mostrar = df_audit[df_audit['Liquidada'] == 'Si']
+        else:
+            df_mostrar = df_audit
+            
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Limpiar columnas para mostrar
+        cols_mostrar = ['CUI', 'Nombre', 'Gestión de Origen', 'Fecha Inicio (INFOBRAS)', 'Fecha Liquidación', 
+                        'Avance Físico % (INFOBRAS)', 'Avance Financiero % (MEF)', 'Estado (INFOBRAS)', 'COSTO_ACTUAL', 'MONTO_EJECUCION_TOTAL']
+        
+        # Filtrar solo columnas que existan
+        cols_mostrar = [c for c in cols_mostrar if c in df_mostrar.columns]
+        
+        st.markdown(f"**Resultados:** {len(df_mostrar)} proyectos encontrados.")
+        st.dataframe(df_mostrar[cols_mostrar], use_container_width=True)
+        
+    else:
+        st.info("No hay datos disponibles o debe realizar una búsqueda en la izquierda para cargar las obras.")
+        
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # End of app
