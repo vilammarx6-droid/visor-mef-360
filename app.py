@@ -385,6 +385,7 @@ with tab1:
     with c5: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #3b82f6;"><div class="kpi-title">PIM solo en Obras</div><div class="kpi-value">{format_money(pim_obras)}</div></div>', unsafe_allow_html=True)
     with c6: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #10b981;"><div class="kpi-title">Gasto solo en Obras</div><div class="kpi-value">{format_money(dev_obras)}</div></div>', unsafe_allow_html=True)
     with c7: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #f59e0b;"><div class="kpi-title">Avance Financiero Obras</div><div class="kpi-value">{avance_obras:.1f}%</div></div>', unsafe_allow_html=True)
+    st.markdown("<div style='font-size: 13px; color: #64748b; margin-top: 5px; margin-bottom: 15px;'><i>*Nota: El Avance Financiero en esta pestaña es <strong>ANUAL</strong> (Gasto del Año / Presupuesto PIM del Año). Para ver el avance de toda la vida del proyecto (Histórico), revisa la Pestaña 2 (VERSUS).</i></div>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
     st.markdown('### 📊 Origen y Destino de los Fondos')
