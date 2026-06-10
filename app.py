@@ -47,12 +47,12 @@ st.markdown("""
     .section-title { font-size: 26px; font-weight: 900; color: #0f172a; margin-bottom: 5px; text-align: center; }
     .section-subtitle { font-size: 14px; color: #64748b; margin-bottom: 20px; text-align: center; }
 
-    .card-white { background-color: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: 100%; color: #0f172a !important; }
-    .card-white h1, .card-white h2, .card-white h3, .card-white h4, .card-white h5, .card-white h6 { color: #0f172a !important; }
+    .card-white { background-color: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); height: 100%; color: #0f172a !important; }
+    .card-white h1, .card-white h2, .card-white h3, .card-white h4, .card-white h5, .card-white h6 { color: #0f172a !important; font-size: 14px !important; margin-bottom: 10px; }
     
-    .kpi-container { background-color: #f1f5f9; border-radius: 8px; padding: 15px; text-align: center; border: 1px solid #e2e8f0; }
-    .kpi-title { font-size: 13px; color: #64748b !important; font-weight: 700; margin-bottom: 5px; text-transform: uppercase; }
-    .kpi-value { font-size: 28px; font-weight: 900; color: #0f172a !important; }
+    .kpi-container { background-color: #f1f5f9; border-radius: 6px; padding: 10px 15px; border: 1px solid #e2e8f0; text-align: left; }
+    .kpi-title { font-size: 11px; color: #64748b !important; font-weight: 700; margin-bottom: 2px; text-transform: uppercase; }
+    .kpi-value { font-size: 20px; font-weight: 900; color: #0f172a !important; }
     
     .stTabs [data-baseweb="tab-list"] { gap: 2px; }
     .stTabs [data-baseweb="tab"] { background-color: #e2e8f0; border-radius: 6px 6px 0 0; padding: 12px 20px; font-weight: bold; color: #475569; font-size: 15px; }
@@ -360,8 +360,8 @@ with tab1:
             # Acortar nombres muy largos para que el gráfico no se deforme
             df_rubro['Rubro'] = df_rubro['Rubro'].apply(lambda x: (str(x)[:35] + '..') if len(str(x)) > 35 else str(x))
             fig_rubro = px.bar(df_rubro, x='PIM', y='Rubro', orientation='h', color='% Avance', color_continuous_scale='RdYlGn', range_color=[0, 100], text='PIM')
-            fig_rubro.update_traces(texttemplate='S/ %{text:,.0s}', textposition='inside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<br>Avance: %{marker.color:.1f}%<extra></extra>')
-            fig_rubro.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=350, coloraxis_colorbar=dict(title="% Avance"))
+            fig_rubro.update_traces(texttemplate='S/ %{text:,.0s}', textposition='outside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<br>Avance: %{marker.color:.1f}%<extra></extra>', width=0.4)
+            fig_rubro.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_colorbar=dict(title="% Avance"))
             st.plotly_chart(fig_rubro, use_container_width=True, config={'displayModeBar': False})
 
     with col_dest:
@@ -382,8 +382,8 @@ with tab1:
         if not df_funcion.empty:
             df_funcion['Funcion'] = df_funcion['Funcion'].apply(lambda x: (str(x)[:35] + '..') if len(str(x)) > 35 else str(x))
             fig_funcion = px.bar(df_funcion, x='PIM', y='Funcion', orientation='h', color='% Avance', color_continuous_scale='RdYlGn', range_color=[0, 100], text='PIM')
-            fig_funcion.update_traces(texttemplate='S/ %{text:,.0s}', textposition='inside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<br>Avance: %{marker.color:.1f}%<extra></extra>')
-            fig_funcion.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=350, coloraxis_colorbar=dict(title="% Avance"))
+            fig_funcion.update_traces(texttemplate='S/ %{text:,.0s}', textposition='outside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<br>Avance: %{marker.color:.1f}%<extra></extra>', width=0.4)
+            fig_funcion.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_colorbar=dict(title="% Avance"))
             st.plotly_chart(fig_funcion, use_container_width=True, config={'displayModeBar': False})
             
     st.markdown('</div><br>', unsafe_allow_html=True)
@@ -396,9 +396,22 @@ with tab1:
     df_curva = conn.execute(curva_query).df()
     if not df_curva.empty:
         df_curva['Dinero Gastado Acumulado'] = df_curva['Devengado'].cumsum() / 1e6
-        fig_line = px.line(df_curva, x='Mes_Num', y='Dinero Gastado Acumulado', markers=True)
-        fig_line.update_traces(line_color='#1e293b', line_width=4, marker=dict(size=10, color='#ef4444'), hovertemplate='<b>Mes %{x}</b><br>Gasto Acumulado: S/ %{y:,.1f} Millones<extra></extra>')
-        fig_line.update_layout(margin=dict(t=20, l=20, r=20, b=20), height=400, xaxis_title="Mes del Año", yaxis_title="Millones (S/.)")
+        fig_line = px.line(df_curva, x='Mes_Num', y='Dinero Gastado Acumulado', title="")
+        fig_line.update_traces(
+            line_color='#0ea5e9', 
+            line_width=3, 
+            line_shape='spline',
+            hovertemplate='S/ %{y:,.1f} M<extra></extra>'
+        )
+        fig_line.update_layout(
+            hovermode='x unified',
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            xaxis=dict(showgrid=False, zeroline=False, title="Mes del Año", showspikes=True, spikemode='across', spikethickness=1, spikedash='solid', spikecolor='#94a3b8'),
+            yaxis=dict(showgrid=True, gridcolor='#f1f5f9', zeroline=False, title="Millones (S/.)"),
+            margin=dict(t=20, l=10, r=10, b=10), 
+            height=280
+        )
         st.plotly_chart(fig_line, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div><br>', unsafe_allow_html=True)
 
@@ -419,9 +432,9 @@ with tab1:
     """
     df_pie = conn.execute(pie_query).df()
     if not df_pie.empty:
-        fig_pie = px.pie(df_pie, values='Presupuesto', names='Tipo_Gasto', hole=0.4, 
+        fig_pie = px.pie(df_pie, values='Presupuesto', names='Tipo_Gasto', hole=0.5, 
                          color_discrete_sequence=['#3b82f6', '#ef4444', '#f59e0b', '#94a3b8'])
-        fig_pie.update_layout(margin=dict(t=20, b=20, l=20, r=20), height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+        fig_pie.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=280, legend=dict(orientation="v", yanchor="auto", y=0.5, xanchor="right", x=1))
         fig_pie.update_traces(hovertemplate='<b>%{label}</b><br>Presupuesto: S/ %{value:,.0f}<extra></extra>')
         st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div><br>', unsafe_allow_html=True)
@@ -443,8 +456,8 @@ with tab1:
         df_gen['Categoria'] = df_gen['Categoria'].str.replace('PERSONAL Y OBLIGACIONES SOCIALES', 'Pago de Personal (Planillas)')
         
         fig_gen = px.bar(df_gen, x='PIM', y='Categoria', orientation='h', text='PIM', color='PIM', color_continuous_scale='Teal')
-        fig_gen.update_traces(texttemplate='S/ %{text:,.0s}', textposition='outside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<extra></extra>')
-        fig_gen.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=350, coloraxis_showscale=False)
+        fig_gen.update_traces(texttemplate='S/ %{text:,.0s}', textposition='outside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<extra></extra>', width=0.4)
+        fig_gen.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_showscale=False)
         st.plotly_chart(fig_gen, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div><br>', unsafe_allow_html=True)
     
@@ -493,8 +506,8 @@ with tab1:
                              color_discrete_map={'Históricas (Infobras)': '#94a3b8', 'Activas (MEF 2026)': '#3b82f6'},
                              text='Cantidad de Obras')
                              
-            fig_reg.update_traces(texttemplate='%{text:,.0f}', textposition='outside', hovertemplate='<b>%{y}</b><br>%{x:,.0f} Obras<extra></extra>')
-            fig_reg.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=550, yaxis_title="", yaxis={'categoryorder':'total ascending'}, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=""))
+            fig_reg.update_traces(texttemplate='%{text:,.0f}', textposition='outside', hovertemplate='<b>%{y}</b><br>%{x:,.0f} Obras<extra></extra>', width=0.35)
+            fig_reg.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=400, yaxis_title="", yaxis={'categoryorder':'total ascending'}, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=""))
             st.plotly_chart(fig_reg, use_container_width=True, config={'displayModeBar': False})
     except Exception as e:
         pass
@@ -532,13 +545,17 @@ with tab2:
                 ROUND(TRY_CAST(i.AVANCE_FISICO_INFOBRAS AS DOUBLE), 1) as "Avance Físico % (INFOBRAS)",
                 i.Fecha_de_inicio_de_obra as "Fecha Inicio (INFOBRAS)",
                 i.Fecha_finalizaci_n_programada_de_obra as "Fecha Fin Prog. (INFOBRAS)",
+                COALESCE(i.Tiene_Liquidacion, 'No') as "Liquidada",
+                i.Fecha_Liquidacion as "Fecha Liquidación",
                 COALESCE(TRY_CAST(p.ES_PARALIZADA AS INTEGER), 0) as "Paralizada"
             FROM mef_data m
             LEFT JOIN (
                 SELECT CUI_INFOBRAS, 
                        MAX(TRY_CAST(AVANCE_FISICO_INFOBRAS AS DOUBLE)) as AVANCE_FISICO_INFOBRAS,
                        MAX(Fecha_de_inicio_de_obra) as Fecha_de_inicio_de_obra,
-                       MAX(Fecha_finalizaci_n_programada_de_obra) as Fecha_finalizaci_n_programada_de_obra
+                       MAX(Fecha_finalizaci_n_programada_de_obra) as Fecha_finalizaci_n_programada_de_obra,
+                       MAX(TRY_CAST(_Tiene_liquidaci_n_de_obra_ AS VARCHAR)) as Tiene_Liquidacion,
+                       MAX(Fecha_de_aprobaci_n_de_liquidaci_n_de_obra) as Fecha_Liquidacion
                 FROM 'infobras_avance.parquet' 
                 GROUP BY 1
             ) i ON m.CUI = i.CUI_INFOBRAS
@@ -609,22 +626,25 @@ with tab2:
             
             # 2. UI de Filtros Interactivos (Arriba de los gráficos)
             st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Filtros de Auditoría Ciudadana</h4>', unsafe_allow_html=True)
-            fc1, fc2, fc3 = st.columns([1, 1, 1])
+            fc1, fc2, fc3, fc4 = st.columns([1, 1, 1, 1])
             with fc1:
                 filtro_tabla = st.radio(
-                    "🔍 **Filtro de Estado de la Obra:**",
-                    [f"🔵 Todas las Obras ({len(df_vs)})", 
-                     f"⚫ SOLO Paralizadas ({int(df_vs['Paralizada'].sum())})", 
-                     f"🔴 SOLO con Desfase Crítico ({len(df_vs[df_vs['Desbalance'] > 30])})"],
+                    "🔍 **Estado de la Obra:**",
+                    [f"🔵 Todas ({len(df_vs)})", 
+                     f"⚫ Paralizadas ({int(df_vs['Paralizada'].sum())})", 
+                     f"🔴 Desfase ({len(df_vs[df_vs['Desbalance'] > 30])})"],
                     horizontal=True,
                     key="filtro_kpi_radio"
                 )
             with fc2:
                 lista_gestiones = ["Todas las Gestiones"] + sorted([g for g in df_vs['Gestión de Origen'].unique() if g != "Indeterminada"], reverse=True) + ["Indeterminada"]
-                filtro_gestion = st.selectbox("🏛️ **Filtro por Gestión (Origen):**", lista_gestiones)
+                filtro_gestion = st.selectbox("🏛️ **Gestión (Origen):**", lista_gestiones)
             with fc3:
                 lista_plazos = ["Todos los Plazos", "Plazo Vencido (Retraso/Liquidación)", "En Plazo (Vigente)", "Sin Cronograma"]
-                filtro_plazo = st.selectbox("⏳ **Filtro por Vigencia del Plazo:**", lista_plazos)
+                filtro_plazo = st.selectbox("⏳ **Vigencia del Plazo:**", lista_plazos)
+            with fc4:
+                lista_liq = ["Todas las Obras", "Liquidadas (Cerradas)", "No Liquidadas (Abiertas)"]
+                filtro_liq = st.selectbox("📄 **Liquidación:**", lista_liq)
                 
             # 3. Aplicar Filtros al DataFrame principal (df_filtered)
             df_filtered = df_vs.copy()
@@ -641,6 +661,11 @@ with tab2:
                 
             if filtro_plazo != "Todos los Plazos":
                 df_filtered = df_filtered[df_filtered['Estado del Plazo'] == filtro_plazo]
+                
+            if filtro_liq == "Liquidadas (Cerradas)":
+                df_filtered = df_filtered[df_filtered['Liquidada'] == 'Si']
+            elif filtro_liq == "No Liquidadas (Abiertas)":
+                df_filtered = df_filtered[df_filtered['Liquidada'] != 'Si']
                 
             # 4. Calcular KPIs basados en el DF filtrado
             total_obras_f = len(df_filtered)
@@ -696,14 +721,15 @@ with tab2:
                     fig_bar_macro.update_traces(
                         texttemplate='<b>%{text:.1f}%</b>', 
                         textposition='auto', 
-                        textfont_size=16, 
+                        textfont_size=12, 
                         textfont_color='white',
-                        hovertemplate='<b>%{y}</b><br>Promedio: %{x:.1f}%<extra></extra>'
+                        hovertemplate='<b>%{y}</b><br>Promedio: %{x:.1f}%<extra></extra>',
+                        width=0.4
                     )
                     fig_bar_macro.update_layout(
                         xaxis=dict(range=[0, max(100, max(avg_fin, avg_fis) + 10)]),
-                        margin=dict(t=20, l=10, r=20, b=20),
-                        height=250,
+                        margin=dict(t=10, l=10, r=20, b=10),
+                        height=180,
                         showlegend=False
                     )
                     st.plotly_chart(fig_bar_macro, use_container_width=True, config={'displayModeBar': False})
@@ -725,11 +751,12 @@ with tab2:
                     )
                     fig_gest.update_traces(
                         textposition='outside',
-                        hovertemplate='<b>Gestión:</b> %{y}<br><b>Total:</b> %{x} Obras<extra></extra>'
+                        hovertemplate='<b>Gestión:</b> %{y}<br><b>Total:</b> %{x} Obras<extra></extra>',
+                        width=0.4
                     )
                     fig_gest.update_layout(
-                        margin=dict(t=20, l=10, r=40, b=20),
-                        height=250,
+                        margin=dict(t=10, l=10, r=40, b=10),
+                        height=200,
                         showlegend=False,
                         coloraxis_showscale=False
                     )
@@ -758,12 +785,13 @@ with tab2:
                 fig_gest_perf.update_traces(
                     texttemplate='<b>%{text:.1f}%</b>', 
                     textposition='outside',
-                    hovertemplate='<b>Gestión:</b> %{y}<br><b>Tipo:</b> %{data.name}<br><b>Promedio:</b> %{x:.1f}%<extra></extra>'
+                    hovertemplate='<b>Gestión:</b> %{y}<br><b>Tipo:</b> %{data.name}<br><b>Promedio:</b> %{x:.1f}%<extra></extra>',
+                    width=0.35
                 )
                 fig_gest_perf.update_layout(
                     xaxis=dict(range=[0, 115]),
-                    margin=dict(t=20, l=10, r=40, b=20),
-                    height=300,
+                    margin=dict(t=10, l=10, r=40, b=10),
+                    height=250,
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None)
                 )
                 st.plotly_chart(fig_gest_perf, use_container_width=True, config={'displayModeBar': False})
@@ -989,6 +1017,49 @@ with tab4:
                     except Exception as e:
                         st.error("No se pudo cargar el historial remoto. Asegúrate de tener conexión a internet.")
 
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown('<h4 style="color:#0f172a; font-weight:bold; font-size:18px;">IV. LÍNEA DE TIEMPO DE PROFESIONALES (Residentes y Supervisores)</h4>', unsafe_allow_html=True)
+                st.markdown('<div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 15px; border-radius: 4px; font-size: 13.5px; color: #0f172a;">⚠️ <b>Auditoría de Personal:</b> Múltiples cambios de Residente de Obra en cortos periodos de tiempo es una de las principales alertas de paralización inminente, corrupción o deficiencias graves en el Expediente Técnico.</div>', unsafe_allow_html=True)
+                
+                if os.path.exists('infobras_avance.parquet'):
+                    prof_query = f"""
+                        SELECT 
+                            CAST(A_o_de_avance AS INTEGER) as "Año",
+                            CAST(Mes_de_avance AS INTEGER) as "Mes_Num",
+                            CASE 
+                                WHEN Mes_de_avance = 1 THEN 'Enero' WHEN Mes_de_avance = 2 THEN 'Febrero' WHEN Mes_de_avance = 3 THEN 'Marzo'
+                                WHEN Mes_de_avance = 4 THEN 'Abril' WHEN Mes_de_avance = 5 THEN 'Mayo' WHEN Mes_de_avance = 6 THEN 'Junio'
+                                WHEN Mes_de_avance = 7 THEN 'Julio' WHEN Mes_de_avance = 8 THEN 'Agosto' WHEN Mes_de_avance = 9 THEN 'Septiembre'
+                                WHEN Mes_de_avance = 10 THEN 'Octubre' WHEN Mes_de_avance = 11 THEN 'Noviembre' WHEN Mes_de_avance = 12 THEN 'Diciembre'
+                                ELSE CAST(Mes_de_avance AS VARCHAR)
+                            END as "Mes",
+                            Nombres_Apellidos_1 as "Ingeniero Residente",
+                            Nombres_Apellidos as "Ingeniero Supervisor / Inspector"
+                        FROM 'infobras_avance.parquet'
+                        WHERE CUI_INFOBRAS = '{cui_code}' 
+                          AND A_o_de_avance IS NOT NULL 
+                          AND Mes_de_avance IS NOT NULL
+                        ORDER BY "Año" DESC, "Mes_Num" DESC
+                    """
+                    try:
+                        df_prof = conn.execute(prof_query).df()
+                        if not df_prof.empty:
+                            df_prof = df_prof.drop(columns=['Mes_Num'])
+                            df_prof = df_prof.fillna("No registrado")
+                            
+                            st.dataframe(df_prof, use_container_width=True, hide_index=True)
+                            
+                            # Mostrar KPI rápido de cantidad de residentes
+                            num_residentes = df_prof['Ingeniero Residente'].nunique()
+                            if num_residentes > 3:
+                                st.error(f"🚨 **ALERTA ROJA:** Esta obra ha tenido **{num_residentes}** ingenieros residentes distintos. Esta alta rotación es un indicador crítico de riesgo.")
+                            elif num_residentes > 1:
+                                st.warning(f"⚠️ **Atención:** Esta obra ha tenido **{num_residentes}** ingenieros residentes distintos.")
+                        else:
+                            st.info("No hay registros históricos de profesionales para esta obra en la Contraloría.")
+                    except Exception as e:
+                        st.warning("No se pudo cargar el historial de profesionales.")
+                
                 st.markdown("<br><b>Desglose por Meta y Clasificador de Gasto (Año Actual):</b>", unsafe_allow_html=True)
                 
                 detail_query = f"""
