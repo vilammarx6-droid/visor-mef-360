@@ -706,33 +706,30 @@ with tab2:
                     suma_peso_fisico = df_fis['Peso'].sum()
                     avg_fis = (df_fis['Avance Físico % (INFOBRAS)'] * df_fis['Peso']).sum() / suma_peso_fisico if suma_peso_fisico > 0 else 0
                     
-                    import pandas as pd
-                    df_macro = pd.DataFrame({
-                        'Indicador': ['1. Plata Pagada<br>(Av. Financiero)', '2. Construcción Real<br>(Av. Físico)'],
-                        'Porcentaje Promedio': [avg_fin, avg_fis]
-                    })
-                    
-                    fig_bar_macro = px.bar(
-                        df_macro, x='Porcentaje Promedio', y='Indicador', orientation='h',
-                        color='Indicador', 
-                        color_discrete_map={'1. Plata Pagada<br>(Av. Financiero)': '#ef4444', '2. Construcción Real<br>(Av. Físico)': '#3b82f6'},
-                        text='Porcentaje Promedio'
-                    )
-                    fig_bar_macro.update_traces(
-                        texttemplate='<b>%{text:.1f}%</b>', 
-                        textposition='auto', 
-                        textfont_size=12, 
-                        textfont_color='white',
-                        hovertemplate='<b>%{y}</b><br>Promedio: %{x:.1f}%<extra></extra>',
-                        width=0.4
-                    )
-                    fig_bar_macro.update_layout(
-                        xaxis=dict(range=[0, max(100, max(avg_fin, avg_fis) + 10)]),
-                        margin=dict(t=10, l=10, r=20, b=10),
-                        height=180,
-                        showlegend=False
-                    )
-                    st.plotly_chart(fig_bar_macro, use_container_width=True, config={'displayModeBar': False})
+                    html_macro = f"""
+                    <div style="margin-top: 35px;">
+                        <div style="margin-bottom: 30px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="font-size: 14px; font-weight: 600; color: #334155;">1. Plata Pagada (Av. Financiero)</span>
+                                <span style="font-size: 14px; font-weight: 800; color: #ef4444;">{avg_fin:.1f}%</span>
+                            </div>
+                            <div style="width: 100%; background-color: #f1f5f9; border-radius: 6px; height: 14px; overflow: hidden; border: 1px solid #e2e8f0;">
+                                <div style="width: {min(100, avg_fin)}%; background-color: #ef4444; height: 100%; border-radius: 6px;"></div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 20px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                                <span style="font-size: 14px; font-weight: 600; color: #334155;">2. Construcción Real (Av. Físico)</span>
+                                <span style="font-size: 14px; font-weight: 800; color: #3b82f6;">{avg_fis:.1f}%</span>
+                            </div>
+                            <div style="width: 100%; background-color: #f1f5f9; border-radius: 6px; height: 14px; overflow: hidden; border: 1px solid #e2e8f0;">
+                                <div style="width: {min(100, avg_fis)}%; background-color: #3b82f6; height: 100%; border-radius: 6px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                    """
+                    st.markdown(html_macro, unsafe_allow_html=True)
                 else:
                     st.info("No hay datos que coincidan con los filtros.")
                 st.markdown('</div>', unsafe_allow_html=True)
@@ -744,23 +741,27 @@ with tab2:
                     df_gest.columns = ['Gestión', 'Cantidad de Obras']
                     df_gest = df_gest.sort_values(by="Gestión", ascending=False)
                     
-                    fig_gest = px.bar(
-                        df_gest, x='Cantidad de Obras', y='Gestión', orientation='h',
-                        color='Cantidad de Obras', color_continuous_scale='Purp',
-                        text='Cantidad de Obras'
-                    )
-                    fig_gest.update_traces(
-                        textposition='outside',
-                        hovertemplate='<b>Gestión:</b> %{y}<br><b>Total:</b> %{x} Obras<extra></extra>',
-                        width=0.4
-                    )
-                    fig_gest.update_layout(
-                        margin=dict(t=10, l=10, r=40, b=10),
-                        height=200,
-                        showlegend=False,
-                        coloraxis_showscale=False
-                    )
-                    st.plotly_chart(fig_gest, use_container_width=True, config={'displayModeBar': False})
+                    max_obras = df_gest['Cantidad de Obras'].max()
+                    
+                    html_gest = '<div style="margin-top: 25px; max-height: 250px; overflow-y: auto; padding-right: 10px;">'
+                    colors = ['#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9', '#14b8a6', '#10b981']
+                    
+                    for i, row in df_gest.iterrows():
+                        pct = (row['Cantidad de Obras'] / max_obras) * 100 if max_obras > 0 else 0
+                        color = colors[i % len(colors)]
+                        html_gest += f"""
+                        <div style="margin-bottom: 18px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                                <span style="font-size: 13px; font-weight: 600; color: #475569;">{row['Gestión']}</span>
+                                <span style="font-size: 13px; font-weight: 800; color: #0f172a;">{row['Cantidad de Obras']} <span style="font-weight: 400; color: #64748b;">obras</span></span>
+                            </div>
+                            <div style="width: 100%; background-color: #f1f5f9; border-radius: 4px; height: 10px; overflow: hidden;">
+                                <div style="width: {pct}%; background-color: {color}; height: 100%; border-radius: 4px;"></div>
+                            </div>
+                        </div>
+                        """
+                    html_gest += '</div>'
+                    st.markdown(html_gest, unsafe_allow_html=True)
                 else:
                     st.info("No hay datos.")
                 st.markdown('</div>', unsafe_allow_html=True)
