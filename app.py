@@ -784,27 +784,37 @@ with tab2:
                 
                 df_gest_perf = df_gest_perf.sort_values(by="Gestión de Origen", ascending=False)
                 
-                df_gest_long = pd.melt(df_gest_perf, id_vars=['Gestión de Origen'], value_vars=['Plata Pagada (Av. Financiero)', 'Construcción Real (Av. Físico)'], var_name='Tipo de Avance', value_name='Porcentaje Promedio')
+                html_gest_perf = f"""<div class="card-white" style="margin-bottom: 20px;">
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">"""
                 
-                fig_gest_perf = px.bar(
-                    df_gest_long, x='Porcentaje Promedio', y='Gestión de Origen', color='Tipo de Avance', barmode='group', orientation='h',
-                    color_discrete_map={'Plata Pagada (Av. Financiero)': '#ef4444', 'Construcción Real (Av. Físico)': '#3b82f6'},
-                    text='Porcentaje Promedio'
-                )
-                fig_gest_perf.update_traces(
-                    texttemplate='<b>%{text:.1f}%</b>', 
-                    textposition='outside',
-                    hovertemplate='<b>Gestión:</b> %{y}<br><b>Tipo:</b> %{data.name}<br><b>Promedio:</b> %{x:.1f}%<extra></extra>',
-                    width=0.35
-                )
-                fig_gest_perf.update_layout(
-                    xaxis=dict(range=[0, 115]),
-                    margin=dict(t=10, l=10, r=40, b=10),
-                    height=250,
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None)
-                )
-                st.plotly_chart(fig_gest_perf, use_container_width=True, config={'displayModeBar': False})
-                st.markdown('<br>', unsafe_allow_html=True)
+                for _, row in df_gest_perf.iterrows():
+                    av_fin = row['Plata Pagada (Av. Financiero)']
+                    av_fis = row['Construcción Real (Av. Físico)']
+                    
+                    html_gest_perf += f"""<div style="padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; background-color: #f8fafc;">
+<div style="font-weight: 700; color: #0f172a; margin-bottom: 12px; font-size: 14px;">📅 {row['Gestión de Origen']}</div>
+<div style="margin-bottom: 10px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+<span style="font-size: 12px; font-weight: 600; color: #475569;">1. Plata Pagada</span>
+<span style="font-size: 12px; font-weight: 800; color: #ef4444;">{av_fin:.1f}%</span>
+</div>
+<div style="width: 100%; background-color: #e2e8f0; border-radius: 4px; height: 8px; overflow: hidden;">
+<div style="width: {min(100, av_fin)}%; background-color: #ef4444; height: 100%; border-radius: 4px;"></div>
+</div>
+</div>
+<div style="margin-bottom: 0px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+<span style="font-size: 12px; font-weight: 600; color: #475569;">2. Construcción Real</span>
+<span style="font-size: 12px; font-weight: 800; color: #3b82f6;">{av_fis:.1f}%</span>
+</div>
+<div style="width: 100%; background-color: #e2e8f0; border-radius: 4px; height: 8px; overflow: hidden;">
+<div style="width: {min(100, av_fis)}%; background-color: #3b82f6; height: 100%; border-radius: 4px;"></div>
+</div>
+</div>
+</div>"""
+                
+                html_gest_perf += "</div></div>"
+                st.markdown(html_gest_perf, unsafe_allow_html=True)
             
             # 7. Tabla Resumen de Sobrecostos e Irregularidades
             st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Súper Tabla de Gastos vs Avance Físico</h4>', unsafe_allow_html=True)
