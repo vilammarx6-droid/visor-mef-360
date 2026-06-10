@@ -116,12 +116,17 @@ def get_latest_parquet_and_download():
         if not os.path.exists(file):
             url = f"https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{file}"
             with st.spinner(f"Descargando {file} desde HuggingFace (Puede tardar 1-2 min)..."):
-                response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'})
-                if response.status_code == 200:
-                    with open(file, 'wb') as f:
-                        for chunk in response.iter_content(chunk_size=8192): f.write(chunk)
-                else:
-                    st.error(f"⚠️ Error 404: No se encontró '{file}' en HuggingFace.")
+                try:
+                    response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'}, timeout=(15, 120))
+                    if response.status_code == 200:
+                        with open(file, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=1024*1024): 
+                                if chunk:
+                                    f.write(chunk)
+                    else:
+                        st.error(f"⚠️ Error {response.status_code}: No se encontró '{file}' en HuggingFace.")
+                except Exception as e:
+                    st.error(f"Error descargando {file}: {e}")
                     
     return main_parquet
 
@@ -287,12 +292,18 @@ with tab1:
     if not os.path.exists(DYNAMIC_PARQUET):
         url = f"https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{DYNAMIC_PARQUET}"
         with st.spinner(f"Descargando datos históricos de {tab1_year}..."):
-            response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'})
-            if response.status_code == 200:
-                with open(DYNAMIC_PARQUET, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192): f.write(chunk)
-            else:
-                st.error(f"⚠️ No hay datos disponibles para el año {tab1_year}.")
+            try:
+                response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'}, timeout=(15, 120))
+                if response.status_code == 200:
+                    with open(DYNAMIC_PARQUET, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=1024*1024): 
+                            if chunk:
+                                f.write(chunk)
+                else:
+                    st.error(f"⚠️ No hay datos disponibles para el año {tab1_year}. (Error {response.status_code})")
+                    st.stop()
+            except Exception as e:
+                st.error(f"Error descargando datos históricos: {e}")
                 st.stop()
 
     st.markdown(f'<div class="section-title">Radiografía General de la Entidad (Año {tab1_year})</div>', unsafe_allow_html=True)
