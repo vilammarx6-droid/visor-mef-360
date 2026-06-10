@@ -599,7 +599,8 @@ with tab2:
                        MAX(Fecha_de_inicio_de_obra) as Fecha_de_inicio_de_obra,
                        MAX(Fecha_finalizaci_n_programada_de_obra) as Fecha_finalizaci_n_programada_de_obra,
                        MAX(TRY_CAST(_Tiene_liquidaci_n_de_obra_ AS VARCHAR)) as Tiene_Liquidacion,
-                       MAX(Fecha_de_aprobaci_n_de_liquidaci_n_de_obra) as Fecha_Liquidacion
+                       MAX(Fecha_de_aprobaci_n_de_liquidaci_n_de_obra) as Fecha_Liquidacion,
+                       MAX(TRY_CAST(Estado_de_ejecuci_n AS VARCHAR)) as Estado_INFOBRAS
                 FROM 'infobras_avance.parquet' 
                 -- We select all projects because the user filters by entity name loosely anyway
                 GROUP BY 1
@@ -612,6 +613,7 @@ with tab2:
             SELECT 
                 COALESCE(s.CUI, i.CUI_INFOBRAS) as CUI, 
                 COALESCE(s.Nombre, i.Nombre_INFOBRAS) as Nombre, 
+                COALESCE(i.Estado_INFOBRAS, 'Sin Registro') as "Estado (INFOBRAS)",
                 COALESCE(m.PIA, 0) as PIA, 
                 COALESCE(m.PIM, 0) as PIM, 
                 COALESCE(m.Certificado, 0) as Certificado, 
@@ -922,7 +924,7 @@ with tab2:
                 return ''
                 
             st.dataframe(
-                df_table[['CUI', 'Nombre', 'Gestión de Origen', 'Estado del Plazo', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
+                df_table[['CUI', 'Nombre', 'Gestión de Origen', 'Estado del Plazo', 'Estado (INFOBRAS)', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
                     "Costo Total (MEF)": "S/ {:,.0f}", "Devengado Histórico (MEF)": "S/ {:,.0f}", f"Gasto ({CURRENT_YEAR})": "S/ {:,.0f}", "Desbalance": "{:.1f}%", "Avance Financiero % (MEF)": "{:.1f}%", "Avance Físico % (INFOBRAS)": "{:.1f}%"
                 }), use_container_width=True, hide_index=True, height=500
             )
@@ -936,7 +938,7 @@ with tab2:
             * 🔗 **El Cruce:** El algoritmo enlaza ambas bases de datos usando el **Código Único de Inversión (CUI)** para revelar si lo que se pagó coincide con lo que se construyó.
             """)
 
-            csv_export = df_table[['CUI', 'Nombre', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance']].to_csv(index=False).encode('utf-8-sig')
+            csv_export = df_table[['CUI', 'Nombre', 'Estado (INFOBRAS)', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance']].to_csv(index=False).encode('utf-8-sig')
             st.download_button(
                 label="📥 Descargar esta tabla en Excel (CSV)",
                 data=csv_export,
