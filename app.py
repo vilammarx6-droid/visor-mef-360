@@ -33,30 +33,50 @@ components.html(
 
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    
     footer {visibility: hidden;}
-    .stApp { background-color: #f8fafc; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    .stApp { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
     
     .top-banner {
-        background-color: #1e293b; color: white; padding: 15px 24px;
-        margin-top: -60px; margin-left: -4rem; margin-right: -4rem; margin-bottom: 20px;
-        display: flex; align-items: center; gap: 15px; border-bottom: 4px solid #ef4444;
+        background: linear-gradient(135deg, #0f172a 0%, #312e81 100%);
+        color: white; padding: 20px 30px;
+        margin-top: -60px; margin-left: -4rem; margin-right: -4rem; margin-bottom: 30px;
+        display: flex; align-items: center; gap: 20px; border-bottom: 4px solid #3b82f6;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
-    .top-banner h1 { margin: 0; font-size: 22px; font-weight: 800; color: white; text-transform: uppercase; }
-    .top-banner p { margin: 0; font-size: 13px; color: #94a3b8; }
+    .top-banner h1 { margin: 0; font-size: 24px; font-weight: 900; color: white; text-transform: uppercase; text-shadow: 0 2px 4px rgba(0,0,0,0.3); letter-spacing: -0.5px; }
+    .top-banner p { margin: 0; font-size: 14px; color: #cbd5e1; font-weight: 500; }
 
-    .section-title { font-size: 26px; font-weight: 900; color: #0f172a; margin-bottom: 5px; text-align: center; }
-    .section-subtitle { font-size: 14px; color: #64748b; margin-bottom: 20px; text-align: center; }
+    .section-title { font-size: 28px; font-weight: 900; color: #0f172a; margin-bottom: 8px; text-align: center; letter-spacing: -0.5px; }
+    .section-subtitle { font-size: 15px; color: #64748b; margin-bottom: 25px; text-align: center; }
 
-    .card-white { background-color: white; border-radius: 8px; border: 1px solid #e2e8f0; padding: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); height: 100%; color: #0f172a !important; }
-    .card-white h1, .card-white h2, .card-white h3, .card-white h4, .card-white h5, .card-white h6 { color: #0f172a !important; font-size: 14px !important; margin-bottom: 10px; }
+    .card-white { 
+        background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; 
+        padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); 
+        height: 100%; color: #0f172a !important; 
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .card-white:hover {
+        transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+    }
+    .card-white h1, .card-white h2, .card-white h3, .card-white h4, .card-white h5, .card-white h6 { color: #0f172a !important; font-size: 15px !important; margin-bottom: 15px; font-weight: 800; }
     
-    .kpi-container { background-color: #f1f5f9; border-radius: 6px; padding: 10px 15px; border: 1px solid #e2e8f0; text-align: left; }
-    .kpi-title { font-size: 11px; color: #64748b !important; font-weight: 700; margin-bottom: 2px; text-transform: uppercase; }
-    .kpi-value { font-size: 20px; font-weight: 900; color: #0f172a !important; }
+    .kpi-container { 
+        background-color: white; border-radius: 8px; padding: 15px 20px; 
+        border: 1px solid #e2e8f0; text-align: left;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .kpi-container:hover {
+        transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.08);
+    }
+    .kpi-title { font-size: 12px; color: #64748b !important; font-weight: 700; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+    .kpi-value { font-size: 24px; font-weight: 900; color: #0f172a !important; letter-spacing: -0.5px; }
     
-    .stTabs [data-baseweb="tab-list"] { gap: 2px; }
-    .stTabs [data-baseweb="tab"] { background-color: #e2e8f0; border-radius: 6px 6px 0 0; padding: 12px 20px; font-weight: bold; color: #475569; font-size: 15px; }
-    .stTabs [aria-selected="true"] { background-color: white !important; color: #1e293b !important; border-top: 4px solid #1e293b; }
+    .stTabs [data-baseweb="tab-list"] { gap: 8px; border-bottom: 2px solid #e2e8f0; }
+    .stTabs [data-baseweb="tab"] { background-color: transparent; border-radius: 0; padding: 12px 20px; font-weight: 600; color: #64748b; font-size: 15px; border-bottom: 3px solid transparent; }
+    .stTabs [aria-selected="true"] { background-color: transparent !important; color: #3b82f6 !important; border-bottom: 3px solid #3b82f6 !important; border-top: none !important;}
 </style>
 
 <div class="top-banner">
@@ -128,9 +148,9 @@ if os.path.exists("logo.html"):
     except: pass
 
 st.sidebar.markdown("""
-<div style="text-align: center; margin-bottom: 25px;">
-    <a href="https://www.facebook.com/profile.php?id=61589026953016" target="_blank" style="display: inline-block; background-color: #1877F2; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; margin-bottom: 10px; width: 100%; font-size: 14px;">📘 Síguenos en Facebook</a><br>
-    <a href="https://wa.me/51983140402?text=Hola,%20tengo%20una%20consulta%20sobre%20la%20plataforma%20de%20Auditor%C3%ADa%20Ciudadana" target="_blank" style="display: inline-block; background-color: #25D366; color: white; padding: 10px 15px; border-radius: 5px; text-decoration: none; font-weight: bold; width: 100%; font-size: 14px;">💬 Consultas WhatsApp</a>
+<div style="text-align: center; margin-bottom: 25px; display: flex; flex-direction: column; gap: 10px;">
+    <a href="https://www.facebook.com/profile.php?id=61589026953016" target="_blank" style="display: block; background-color: #1877F2; color: white; padding: 12px 15px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; box-shadow: 0 4px 6px -1px rgba(24, 119, 242, 0.3);">📘 SÍGUENOS EN FACEBOOK</a>
+    <a href="https://wa.me/51983140402?text=Hola,%20tengo%20una%20consulta%20sobre%20la%20plataforma%20de%20Auditor%C3%ADa%20Ciudadana" target="_blank" style="display: block; background-color: #10b981; color: white; padding: 12px 15px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px; box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);">💬 CONSULTAS WHATSAPP</a>
 </div>
 """, unsafe_allow_html=True)
 
@@ -316,25 +336,25 @@ with tab1:
     # Renderizado UI Nivel 1
     st.markdown('<h4 style="font-size: 16px; color: #334155; margin-bottom: 10px;">🏛️ Presupuesto Institucional Total (Incluye Planillas, Deudas y Administrativos)</h4>', unsafe_allow_html=True)
     c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #94a3b8;"><div class="kpi-title">PIA</div><div class="kpi-value">{format_money(pia)}</div></div>', unsafe_allow_html=True)
-    with c2: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #3b82f6;"><div class="kpi-title">PIM</div><div class="kpi-value">{format_money(pim)}</div></div>', unsafe_allow_html=True)
-    with c3: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #8b5cf6;"><div class="kpi-title">Certificación</div><div class="kpi-value">{format_money(cert)}</div></div>', unsafe_allow_html=True)
-    with c4: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #ec4899;"><div class="kpi-title">Compromiso Anual</div><div class="kpi-value">{format_money(comp)}</div></div>', unsafe_allow_html=True)
+    with c1: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #94a3b8;"><div class="kpi-title">PIA</div><div class="kpi-value">{format_money(pia)}</div></div>', unsafe_allow_html=True)
+    with c2: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #3b82f6;"><div class="kpi-title">PIM</div><div class="kpi-value">{format_money(pim)}</div></div>', unsafe_allow_html=True)
+    with c3: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #8b5cf6;"><div class="kpi-title">Certificación</div><div class="kpi-value">{format_money(cert)}</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #ec4899;"><div class="kpi-title">Compromiso Anual</div><div class="kpi-value">{format_money(comp)}</div></div>', unsafe_allow_html=True)
     st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
     c5, c6, c7, c8 = st.columns(4)
-    with c5: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #10b981;"><div class="kpi-title">Devengado</div><div class="kpi-value">{format_money(dev)}</div></div>', unsafe_allow_html=True)
-    with c6: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #14b8a6;"><div class="kpi-title">Girado</div><div class="kpi-value">{format_money(gir)}</div></div>', unsafe_allow_html=True)
-    with c7: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #f59e0b;"><div class="kpi-title">Avance %</div><div class="kpi-value">{avance:.1f}%</div></div>', unsafe_allow_html=True)
+    with c5: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #10b981;"><div class="kpi-title">Devengado</div><div class="kpi-value">{format_money(dev)}</div></div>', unsafe_allow_html=True)
+    with c6: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #14b8a6;"><div class="kpi-title">Girado</div><div class="kpi-value">{format_money(gir)}</div></div>', unsafe_allow_html=True)
+    with c7: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #f59e0b;"><div class="kpi-title">Avance %</div><div class="kpi-value">{avance:.1f}%</div></div>', unsafe_allow_html=True)
     
     st.markdown('<br>', unsafe_allow_html=True)
     
     # Renderizado UI Nivel 2
     st.markdown('<h4 style="font-size: 16px; color: #334155; margin-bottom: 10px;">🏗️ Presupuesto Exclusivo para Obras de Inversión (Fierro y Cemento)</h4>', unsafe_allow_html=True)
     c4, c5, c6, c7 = st.columns(4)
-    with c4: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #8b5cf6;"><div class="kpi-title">Obras Activas (Total)</div><div class="kpi-value">{obras_count:,.0f}</div></div>', unsafe_allow_html=True)
-    with c5: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #3b82f6;"><div class="kpi-title">PIM solo en Obras</div><div class="kpi-value">{format_money(pim_obras)}</div></div>', unsafe_allow_html=True)
-    with c6: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #10b981;"><div class="kpi-title">Gasto solo en Obras</div><div class="kpi-value">{format_money(dev_obras)}</div></div>', unsafe_allow_html=True)
-    with c7: st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #f59e0b;"><div class="kpi-title">Avance Financiero Obras</div><div class="kpi-value">{avance_obras:.1f}%</div></div>', unsafe_allow_html=True)
+    with c4: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #8b5cf6;"><div class="kpi-title">Obras Activas (Total)</div><div class="kpi-value">{obras_count:,.0f}</div></div>', unsafe_allow_html=True)
+    with c5: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #3b82f6;"><div class="kpi-title">PIM solo en Obras</div><div class="kpi-value">{format_money(pim_obras)}</div></div>', unsafe_allow_html=True)
+    with c6: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #10b981;"><div class="kpi-title">Gasto solo en Obras</div><div class="kpi-value">{format_money(dev_obras)}</div></div>', unsafe_allow_html=True)
+    with c7: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #f59e0b;"><div class="kpi-title">Avance Financiero Obras</div><div class="kpi-value">{avance_obras:.1f}%</div></div>', unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
     st.markdown('### 📊 Origen y Destino de los Fondos')
@@ -680,9 +700,9 @@ with tab2:
             # FILA 1: CONTEO DE OBRAS (3 Tarjetas)
             st.markdown('<h5 style="color:#334155; margin-bottom: 12px; font-size:15px; font-weight:800;">📉 Alertas Críticas (Cantidad de Proyectos)</h5>', unsafe_allow_html=True)
             sc1, sc2, sc3 = st.columns(3)
-            with sc1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #000;"><div class="kpi-title">Obras Paralizadas (INFOBRAS)</div><div class="kpi-value" style="color:#000;">{paralizadas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras oficialmente reportadas como detenidas en la Contraloría.</div></div>', unsafe_allow_html=True)
-            with sc2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #ef4444;"><div class="kpi-title">Obras con Desfase Crítico</div><div class="kpi-value" style="color:#ef4444;">{criticas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Brecha entre avance financiero y físico > 30%.</div></div>', unsafe_allow_html=True)
-            with sc3: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Obras "Fantasmas" (Plazo Vencido)</div><div class="kpi-value" style="color:#8b5cf6;">{obras_vencidas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras que debieron terminar en 2025 o antes, pero siguen activas.</div></div>', unsafe_allow_html=True)
+            with sc1: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #334155;"><div class="kpi-title">Obras Paralizadas (INFOBRAS)</div><div class="kpi-value" style="color:#334155;">{paralizadas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras oficialmente reportadas como detenidas en la Contraloría.</div></div>', unsafe_allow_html=True)
+            with sc2: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #f43f5e;"><div class="kpi-title">Obras con Desfase Crítico</div><div class="kpi-value" style="color:#f43f5e;">{criticas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Brecha entre avance financiero y físico > 30%.</div></div>', unsafe_allow_html=True)
+            with sc3: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #8b5cf6;"><div class="kpi-title">Obras "Fantasmas" (Plazo Vencido)</div><div class="kpi-value" style="color:#8b5cf6;">{obras_vencidas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras que debieron terminar en 2025 o antes, pero siguen activas.</div></div>', unsafe_allow_html=True)
             
             st.markdown('''<div style="font-size: 12px; color: #64748b; margin-top: 5px; margin-bottom: 25px; font-style: italic;">
                 *Nota: La suma de estas tres alertas puede ser mayor al total de obras analizadas porque un mismo proyecto puede sufrir múltiples problemas a la vez (ej. estar Paralizada y con Plazo Vencido simultáneamente).
@@ -691,8 +711,8 @@ with tab2:
             # FILA 2: DINERO EN RIESGO (2 Tarjetas)
             st.markdown('<h5 style="color:#334155; margin-bottom: 12px; font-size:15px; font-weight:800;">💰 Impacto Financiero en el Presupuesto Actual</h5>', unsafe_allow_html=True)
             sc_ghost1, sc_ghost2 = st.columns(2)
-            with sc_ghost1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #f59e0b;"><div class="kpi-title">Dinero en Riesgo (Desfase y Paralización)</div><div class="kpi-value" style="color:#f59e0b;">S/ {dinero_riesgo_f/1e6:,.1f} M</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Presupuesto ({CURRENT_YEAR}) comprometido en obras detenidas o con grave desfase.</div></div>', unsafe_allow_html=True)
-            with sc_ghost2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Presupuesto Absorbido (Obras Vencidas)</div><div class="kpi-value" style="color:#8b5cf6;">S/ {dinero_vencido_f/1e6:,.1f} M</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Dinero que siguen "chupando" hoy las obras que legalmente ya debieron entregarse.</div></div>', unsafe_allow_html=True)
+            with sc_ghost1: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #f59e0b;"><div class="kpi-title">Dinero en Riesgo (Desfase y Paralización)</div><div class="kpi-value" style="color:#f59e0b;">S/ {dinero_riesgo_f/1e6:,.1f} M</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Presupuesto ({CURRENT_YEAR}) comprometido en obras detenidas o con grave desfase.</div></div>', unsafe_allow_html=True)
+            with sc_ghost2: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #8b5cf6;"><div class="kpi-title">Presupuesto Absorbido (Obras Vencidas)</div><div class="kpi-value" style="color:#8b5cf6;">S/ {dinero_vencido_f/1e6:,.1f} M</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Dinero que siguen "chupando" hoy las obras que legalmente ya debieron entregarse.</div></div>', unsafe_allow_html=True)
             st.markdown("<br>", unsafe_allow_html=True)
             
             # 5. Gráficos MACRO basados en df_filtered
@@ -983,11 +1003,11 @@ with tab4:
                 st.markdown("<br>", unsafe_allow_html=True)
                 k1, k2, k3 = st.columns(3)
                 with k1:
-                    st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #f87171;"><div class="kpi-title">AVANCE % CERTIFICADO</div><div class="kpi-value" style="color:#f87171">{pct_cert:.1f}%</div><div style="font-size:12px;color:#64748b;margin-top:5px;">Por Certificar: S/ {f_soles(c_pim - c_cert)}</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #f87171;"><div class="kpi-title">AVANCE % CERTIFICADO</div><div class="kpi-value" style="color:#f87171">{pct_cert:.1f}%</div><div style="font-size:12px;color:#64748b;margin-top:5px;">Por Certificar: S/ {f_soles(c_pim - c_cert)}</div></div>', unsafe_allow_html=True)
                 with k2:
-                    st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #38bdf8;"><div class="kpi-title">AVANCE % COMPROMISO</div><div class="kpi-value" style="color:#38bdf8">{pct_comp:.1f}%</div><div style="font-size:12px;color:#64748b;margin-top:5px;">Por Comprometer: S/ {f_soles(c_pim - c_comp)}</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #38bdf8;"><div class="kpi-title">AVANCE % COMPROMISO</div><div class="kpi-value" style="color:#38bdf8">{pct_comp:.1f}%</div><div style="font-size:12px;color:#64748b;margin-top:5px;">Por Comprometer: S/ {f_soles(c_pim - c_comp)}</div></div>', unsafe_allow_html=True)
                 with k3:
-                    st.markdown(f'<div class="kpi-container" style="border-left: 4px solid #4ade80;"><div class="kpi-title">AVANCE % DEVENGADO</div><div class="kpi-value" style="color:#4ade80">{pct_dev:.1f}%</div><div style="font-size:12px;color:#64748b;margin-top:5px;">Por Devengar: S/ {f_soles(c_pim - c_dev)}</div></div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #4ade80;"><div class="kpi-title">AVANCE % DEVENGADO</div><div class="kpi-value" style="color:#4ade80">{pct_dev:.1f}%</div><div style="font-size:12px;color:#64748b;margin-top:5px;">Por Devengar: S/ {f_soles(c_pim - c_dev)}</div></div>', unsafe_allow_html=True)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 st.markdown('<h4 style="color:#0f172a; font-weight:bold; font-size:18px;">III. HISTORIA DE LA BILLETERA (Gasto año por año)</h4>', unsafe_allow_html=True)
