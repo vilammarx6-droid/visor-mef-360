@@ -703,29 +703,26 @@ with tab2:
                     suma_peso_fisico = df_fis['Peso'].sum()
                     avg_fis = (df_fis['Avance Físico % (INFOBRAS)'] * df_fis['Peso']).sum() / suma_peso_fisico if suma_peso_fisico > 0 else 0
                     
-                    html_macro = f"""
-                    <div style="margin-top: 35px;">
-                        <div style="margin-bottom: 30px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                                <span style="font-size: 14px; font-weight: 600; color: #334155;">1. Plata Pagada (Av. Financiero)</span>
-                                <span style="font-size: 14px; font-weight: 800; color: #ef4444;">{avg_fin:.1f}%</span>
-                            </div>
-                            <div style="width: 100%; background-color: #f1f5f9; border-radius: 6px; height: 14px; overflow: hidden; border: 1px solid #e2e8f0;">
-                                <div style="width: {min(100, avg_fin)}%; background-color: #ef4444; height: 100%; border-radius: 6px;"></div>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-bottom: 20px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                                <span style="font-size: 14px; font-weight: 600; color: #334155;">2. Construcción Real (Av. Físico)</span>
-                                <span style="font-size: 14px; font-weight: 800; color: #3b82f6;">{avg_fis:.1f}%</span>
-                            </div>
-                            <div style="width: 100%; background-color: #f1f5f9; border-radius: 6px; height: 14px; overflow: hidden; border: 1px solid #e2e8f0;">
-                                <div style="width: {min(100, avg_fis)}%; background-color: #3b82f6; height: 100%; border-radius: 6px;"></div>
-                            </div>
-                        </div>
-                    </div>
-                    """
+                    html_macro = f"""<div style="margin-top: 35px;">
+<div style="margin-bottom: 30px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+<span style="font-size: 14px; font-weight: 600; color: #334155;">1. Plata Pagada (Av. Financiero)</span>
+<span style="font-size: 14px; font-weight: 800; color: #ef4444;">{avg_fin:.1f}%</span>
+</div>
+<div style="width: 100%; background-color: #f1f5f9; border-radius: 6px; height: 14px; overflow: hidden; border: 1px solid #e2e8f0;">
+<div style="width: {min(100, avg_fin)}%; background-color: #ef4444; height: 100%; border-radius: 6px;"></div>
+</div>
+</div>
+<div style="margin-bottom: 20px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+<span style="font-size: 14px; font-weight: 600; color: #334155;">2. Construcción Real (Av. Físico)</span>
+<span style="font-size: 14px; font-weight: 800; color: #3b82f6;">{avg_fis:.1f}%</span>
+</div>
+<div style="width: 100%; background-color: #f1f5f9; border-radius: 6px; height: 14px; overflow: hidden; border: 1px solid #e2e8f0;">
+<div style="width: {min(100, avg_fis)}%; background-color: #3b82f6; height: 100%; border-radius: 6px;"></div>
+</div>
+</div>
+</div>"""
                     st.markdown(html_macro, unsafe_allow_html=True)
                 else:
                     st.info("No hay datos que coincidan con los filtros.")
@@ -746,17 +743,15 @@ with tab2:
                     for i, row in df_gest.iterrows():
                         pct = (row['Cantidad de Obras'] / max_obras) * 100 if max_obras > 0 else 0
                         color = colors[i % len(colors)]
-                        html_gest += f"""
-                        <div style="margin-bottom: 18px;">
-                            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                                <span style="font-size: 13px; font-weight: 600; color: #475569;">{row['Gestión']}</span>
-                                <span style="font-size: 13px; font-weight: 800; color: #0f172a;">{row['Cantidad de Obras']} <span style="font-weight: 400; color: #64748b;">obras</span></span>
-                            </div>
-                            <div style="width: 100%; background-color: #f1f5f9; border-radius: 4px; height: 10px; overflow: hidden;">
-                                <div style="width: {pct}%; background-color: {color}; height: 100%; border-radius: 4px;"></div>
-                            </div>
-                        </div>
-                        """
+                        html_gest += f"""<div style="margin-bottom: 18px;">
+<div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+<span style="font-size: 13px; font-weight: 600; color: #475569;">{row['Gestión']}</span>
+<span style="font-size: 13px; font-weight: 800; color: #0f172a;">{row['Cantidad de Obras']} <span style="font-weight: 400; color: #64748b;">obras</span></span>
+</div>
+<div style="width: 100%; background-color: #f1f5f9; border-radius: 4px; height: 10px; overflow: hidden;">
+<div style="width: {pct}%; background-color: {color}; height: 100%; border-radius: 4px;"></div>
+</div>
+</div>"""
                     html_gest += '</div>'
                     st.markdown(html_gest, unsafe_allow_html=True)
                 else:
@@ -769,7 +764,9 @@ with tab2:
             if not df_filtered.empty:
                 st.markdown('<h4 style="font-weight:bold; font-size:16px; color:#0f172a; margin-top:20px;">⚖️ Desempeño Promedio por Gestión (Avance Físico vs Avance Financiero)</h4>', unsafe_allow_html=True)
                 
-                df_gest_perf = df_filtered.groupby('Gestión de Origen')[['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)']].mean().reset_index()
+                df_gest_perf_data = df_filtered.copy()
+                df_gest_perf_data['Avance Físico % (INFOBRAS)'] = df_gest_perf_data['Avance Físico % (INFOBRAS)'].fillna(0)
+                df_gest_perf = df_gest_perf_data.groupby('Gestión de Origen')[['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)']].mean().reset_index()
                 df_gest_perf = df_gest_perf.sort_values(by="Gestión de Origen", ascending=False)
                 
                 df_gest_long = pd.melt(df_gest_perf, id_vars=['Gestión de Origen'], value_vars=['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)'], var_name='Tipo de Avance', value_name='Porcentaje Promedio')
@@ -793,7 +790,7 @@ with tab2:
                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None)
                 )
                 st.plotly_chart(fig_gest_perf, use_container_width=True, config={'displayModeBar': False})
-                st.markdown('</div><br>', unsafe_allow_html=True)
+                st.markdown('<br>', unsafe_allow_html=True)
             
             # 7. Tabla Resumen de Sobrecostos e Irregularidades
             st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Súper Tabla de Gastos vs Avance Físico</h4>', unsafe_allow_html=True)
