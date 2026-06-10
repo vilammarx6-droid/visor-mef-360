@@ -689,7 +689,6 @@ with tab2:
             col_macro, col_gest = st.columns(2)
             
             with col_macro:
-                st.markdown('<div class="card-white" style="height:350px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">📊 Resumen General: Físico vs Financiero</h4>', unsafe_allow_html=True)
                 if not df_filtered.empty:
                     # 1. Avance Financiero Global (Ponderado)
                     suma_costo = df_filtered['Costo Total (MEF)'].fillna(df_filtered['PIM']).sum()
@@ -703,7 +702,9 @@ with tab2:
                     suma_peso_fisico = df_fis['Peso'].sum()
                     avg_fis = (df_fis['Avance Físico % (INFOBRAS)'] * df_fis['Peso']).sum() / suma_peso_fisico if suma_peso_fisico > 0 else 0
                     
-                    html_macro = f"""<div style="margin-top: 35px;">
+                    html_macro = f"""<div class="card-white" style="height:350px;">
+<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 20px;">📊 Resumen General: Físico vs Financiero</div>
+<div style="margin-top: 15px;">
 <div style="margin-bottom: 30px;">
 <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
 <span style="font-size: 14px; font-weight: 600; color: #334155;">1. Plata Pagada (Av. Financiero)</span>
@@ -722,14 +723,13 @@ with tab2:
 <div style="width: {min(100, avg_fis)}%; background-color: #3b82f6; height: 100%; border-radius: 6px;"></div>
 </div>
 </div>
+</div>
 </div>"""
                     st.markdown(html_macro, unsafe_allow_html=True)
                 else:
-                    st.info("No hay datos que coincidan con los filtros.")
-                st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="card-white" style="height:350px;"><div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 20px;">📊 Resumen General: Físico vs Financiero</div><span style="color:#64748b;">No hay datos que coincidan con los filtros.</span></div>', unsafe_allow_html=True)
                 
             with col_gest:
-                st.markdown('<div class="card-white" style="height:350px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">🏛️ Cantidad de Obras por Gestión (Origen)</h4>', unsafe_allow_html=True)
                 if not df_filtered.empty:
                     df_gest = df_filtered['Gestión de Origen'].value_counts().reset_index()
                     df_gest.columns = ['Gestión', 'Cantidad de Obras']
@@ -737,7 +737,9 @@ with tab2:
                     
                     max_obras = df_gest['Cantidad de Obras'].max()
                     
-                    html_gest = '<div style="margin-top: 25px; max-height: 250px; overflow-y: auto; padding-right: 10px;">'
+                    html_gest = f"""<div class="card-white" style="height:350px;">
+<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 20px;">🏛️ Cantidad de Obras por Gestión (Origen)</div>
+<div style="margin-top: 5px; max-height: 250px; overflow-y: auto; padding-right: 10px;">"""
                     colors = ['#8b5cf6', '#6366f1', '#3b82f6', '#0ea5e9', '#14b8a6', '#10b981']
                     
                     for i, row in df_gest.iterrows():
@@ -752,29 +754,41 @@ with tab2:
 <div style="width: {pct}%; background-color: {color}; height: 100%; border-radius: 4px;"></div>
 </div>
 </div>"""
-                    html_gest += '</div>'
+                    html_gest += '</div></div>'
                     st.markdown(html_gest, unsafe_allow_html=True)
                 else:
-                    st.info("No hay datos.")
-                st.markdown('</div>', unsafe_allow_html=True)
+                    st.markdown('<div class="card-white" style="height:350px;"><div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 20px;">🏛️ Cantidad de Obras por Gestión (Origen)</div><span style="color:#64748b;">No hay datos.</span></div>', unsafe_allow_html=True)
             
             st.markdown('<br>', unsafe_allow_html=True)
             
             # 6. Desempeño Promedio por Gestión
             if not df_filtered.empty:
-                st.markdown('<h4 style="font-weight:bold; font-size:16px; color:#0f172a; margin-top:20px;">⚖️ Desempeño Promedio por Gestión (Avance Físico vs Avance Financiero)</h4>', unsafe_allow_html=True)
+                st.markdown('<h4 style="font-weight:bold; font-size:16px; color:#0f172a; margin-top:20px;">⚖️ Desempeño Real por Gestión (Construcción Real vs Plata Pagada)</h4>', unsafe_allow_html=True)
+                st.markdown('<p style="font-size:13px; color:#64748b; margin-bottom:15px;">Mide la verdadera eficacia: suma todo el presupuesto manejado por una gestión y compara qué porcentaje de la plata ya salió del banco vs qué porcentaje está realmente construido (en fierro y cemento).</p>', unsafe_allow_html=True)
                 
                 df_gest_perf_data = df_filtered.copy()
                 df_gest_perf_data['Avance Físico % (INFOBRAS)'] = df_gest_perf_data['Avance Físico % (INFOBRAS)'].fillna(0)
-                df_gest_perf = df_gest_perf_data.groupby('Gestión de Origen')[['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)']].mean().reset_index()
+                df_gest_perf_data['Costo_Ponderado'] = df_gest_perf_data['Costo Total (MEF)'].fillna(df_gest_perf_data['PIM'])
+                df_gest_perf_data['Fisico_Ponderado'] = df_gest_perf_data['Avance Físico % (INFOBRAS)'] * df_gest_perf_data['Costo_Ponderado']
+                
+                df_gest_perf = df_gest_perf_data.groupby('Gestión de Origen').agg(
+                    Suma_Costo=('Costo_Ponderado', 'sum'),
+                    Suma_Dev=('Devengado Histórico (MEF)', 'sum'),
+                    Suma_Fisico=('Fisico_Ponderado', 'sum')
+                ).reset_index()
+                
+                df_gest_perf['Plata Pagada (Av. Financiero)'] = (df_gest_perf['Suma_Dev'] / df_gest_perf['Suma_Costo']) * 100
+                df_gest_perf['Construcción Real (Av. Físico)'] = df_gest_perf['Suma_Fisico'] / df_gest_perf['Suma_Costo']
+                df_gest_perf['Plata Pagada (Av. Financiero)'] = df_gest_perf['Plata Pagada (Av. Financiero)'].fillna(0)
+                df_gest_perf['Construcción Real (Av. Físico)'] = df_gest_perf['Construcción Real (Av. Físico)'].fillna(0)
+                
                 df_gest_perf = df_gest_perf.sort_values(by="Gestión de Origen", ascending=False)
                 
-                df_gest_long = pd.melt(df_gest_perf, id_vars=['Gestión de Origen'], value_vars=['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)'], var_name='Tipo de Avance', value_name='Porcentaje Promedio')
-                df_gest_long['Tipo de Avance'] = df_gest_long['Tipo de Avance'].replace({'Avance Financiero % (MEF)': 'Avance Financiero', 'Avance Físico % (INFOBRAS)': 'Avance Físico'})
+                df_gest_long = pd.melt(df_gest_perf, id_vars=['Gestión de Origen'], value_vars=['Plata Pagada (Av. Financiero)', 'Construcción Real (Av. Físico)'], var_name='Tipo de Avance', value_name='Porcentaje Promedio')
                 
                 fig_gest_perf = px.bar(
                     df_gest_long, x='Porcentaje Promedio', y='Gestión de Origen', color='Tipo de Avance', barmode='group', orientation='h',
-                    color_discrete_map={'Avance Financiero': '#ef4444', 'Avance Físico': '#3b82f6'},
+                    color_discrete_map={'Plata Pagada (Av. Financiero)': '#ef4444', 'Construcción Real (Av. Físico)': '#3b82f6'},
                     text='Porcentaje Promedio'
                 )
                 fig_gest_perf.update_traces(
