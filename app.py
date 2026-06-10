@@ -577,6 +577,7 @@ with tab2:
             ent_name = ent_name.replace("'", "''")
             
         infobras_filter = f"WHERE Entidad_P_blica = '{ent_name}'" if ent_name else ""
+        join_type = "FULL OUTER JOIN" if ent_name else "LEFT JOIN"
 
         vs_query = f"""
             WITH ssi AS (
@@ -636,7 +637,7 @@ with tab2:
                 i.Fecha_Liquidacion as "Fecha Liquidación",
                 COALESCE(p.ES_PARALIZADA, 0) as "Paralizada"
             FROM ssi s
-            FULL OUTER JOIN infobras i ON s.CUI = i.CUI_INFOBRAS
+            {join_type} infobras i ON s.CUI = i.CUI_INFOBRAS
             LEFT JOIN mef_current m ON COALESCE(s.CUI, i.CUI_INFOBRAS) = m.CUI
             LEFT JOIN paralizadas p ON COALESCE(s.CUI, i.CUI_INFOBRAS) = p.CUI_PARALIZADA
             WHERE s.CUI IS NOT NULL OR i.CUI_INFOBRAS IS NOT NULL
