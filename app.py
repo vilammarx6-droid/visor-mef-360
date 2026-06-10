@@ -198,6 +198,22 @@ if f_sec_eje != "TODOS":
 st.sidebar.markdown("<br><hr style='margin-top:0px; margin-bottom:20px;'>", unsafe_allow_html=True)
 f_search = st.sidebar.text_input("🔎 Buscador libre de CUI o Nombre", "")
 
+# --- BOTON DE ACTUALIZACION ---
+st.sidebar.markdown("<br><hr style='margin-top:0px; margin-bottom:10px;'>", unsafe_allow_html=True)
+if st.sidebar.button("🔄 Forzar Actualización de Datos", help="Descarga la última versión de los datos desde la nube (Hugging Face)."):
+    try:
+        import os
+        import glob
+        for f in glob.glob("*.parquet"):
+            try:
+                os.remove(f)
+            except:
+                pass
+        st.sidebar.success("Caché borrado. Recarga la página (F5) para descargar los datos nuevos.")
+    except Exception as e:
+        st.sidebar.error(f"Error: {e}")
+# ------------------------------
+
 if f_search:
     _sch = f_search.strip().replace("'", "''")
     where_clause += f" AND (PRODUCTO_PROYECTO = '{_sch}' OR PRODUCTO_PROYECTO_NOMBRE LIKE '%{_sch.upper()}%')"
@@ -1098,7 +1114,9 @@ with tab4:
                                 ELSE CAST(Mes_de_avance AS VARCHAR)
                             END as "Mes",
                             Nombres_Apellidos_1 as "Ingeniero Residente",
-                            Nombres_Apellidos as "Ingeniero Supervisor / Inspector"
+                            Nombres_Apellidos as "Ingeniero Supervisor / Inspector",
+                            Nombre_o_raz_n_social_de_la_empresa_o_consorcio as "Empresa Contratista",
+                            Nombre_o_raz_n_social_de_la_empresa_o_consorcio_ as "Empresa Supervisora"
                         FROM 'infobras_avance.parquet'
                         WHERE CUI_INFOBRAS = '{cui_code}' 
                           AND A_o_de_avance IS NOT NULL 
