@@ -569,8 +569,15 @@ with tab2:
     st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
     st.markdown('<h2 style="text-align:center;">🚨 VERSUS: Ejecución Física vs Financiera</h2>', unsafe_allow_html=True)
     st.markdown('<div class="section-subtitle">Detección de Brechas de Ejecución: Obras con alto nivel de gasto pero bajo nivel de avance físico reportado.</div>', unsafe_allow_html=True)
-    
     if os.path.exists('infobras_avance.parquet'):
+        ent_name = ""
+        if f_sec_eje != "TODOS":
+            ent_name_raw = str(f_sec_eje).split(":")[1].strip()
+            ent_name = ent_name_raw.split("-")[0].strip() # 'MUNICIPALIDAD PROVINCIAL DE CHUMBIVILCAS'
+            ent_name = ent_name.replace("'", "''")
+            
+        infobras_filter = f"WHERE Entidad_P_blica = '{ent_name}'" if ent_name else ""
+
         vs_query = f"""
             WITH ssi AS (
                 SELECT CAST(PRODUCTO_PROYECTO AS VARCHAR) as CUI, MAX(PRODUCTO_PROYECTO_NOMBRE) as Nombre,
@@ -593,7 +600,7 @@ with tab2:
                 GROUP BY PRODUCTO_PROYECTO
             ),
             infobras AS (
-                SELECT CAST(CUI_INFOBRAS AS VARCHAR) as CUI_INFOBRAS, 
+                SELECT CAST(TRY_CAST(CUI_INFOBRAS AS BIGINT) AS VARCHAR) as CUI_INFOBRAS, 
                        MAX(Nombre_de_obra) as Nombre_INFOBRAS,
                        MAX(TRY_CAST(AVANCE_FISICO_INFOBRAS AS DOUBLE)) as AVANCE_FISICO_INFOBRAS,
                        MAX(Fecha_de_inicio_de_obra) as Fecha_de_inicio_de_obra,
@@ -602,11 +609,11 @@ with tab2:
                        MAX(Fecha_de_aprobaci_n_de_liquidaci_n_de_obra) as Fecha_Liquidacion,
                        MAX(TRY_CAST(Estado_de_ejecuci_n AS VARCHAR)) as Estado_INFOBRAS
                 FROM 'infobras_avance.parquet' 
-                -- We select all projects because the user filters by entity name loosely anyway
+                {infobras_filter}
                 GROUP BY 1
             ),
             paralizadas AS (
-                SELECT CAST(CUI_PARALIZADA AS VARCHAR) as CUI_PARALIZADA, MAX(TRY_CAST(ES_PARALIZADA AS INTEGER)) as ES_PARALIZADA 
+                SELECT CAST(TRY_CAST(CUI_PARALIZADA AS BIGINT) AS VARCHAR) as CUI_PARALIZADA, MAX(TRY_CAST(ES_PARALIZADA AS INTEGER)) as ES_PARALIZADA 
                 FROM 'infobras_paralizadas.parquet' 
                 GROUP BY 1
             )
@@ -632,7 +639,7 @@ with tab2:
             FULL OUTER JOIN infobras i ON s.CUI = i.CUI_INFOBRAS
             LEFT JOIN mef_current m ON COALESCE(s.CUI, i.CUI_INFOBRAS) = m.CUI
             LEFT JOIN paralizadas p ON COALESCE(s.CUI, i.CUI_INFOBRAS) = p.CUI_PARALIZADA
-            WHERE (s.CUI IS NOT NULL OR (i.CUI_INFOBRAS IS NOT NULL AND i.Nombre_INFOBRAS LIKE '%CHUMBIVILCAS%'))
+            WHERE s.CUI IS NOT NULL OR i.CUI_INFOBRAS IS NOT NULL
         """
         df_vs = conn.execute(vs_query).df()
         
