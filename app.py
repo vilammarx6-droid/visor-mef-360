@@ -572,8 +572,17 @@ with tab2:
     
     if os.path.exists('infobras_avance.parquet'):
         vs_query = f"""
-            WITH mef_data AS (
-                SELECT PRODUCTO_PROYECTO as CUI, MAX(PRODUCTO_PROYECTO_NOMBRE) as Nombre, 
+            WITH ssi AS (
+                SELECT CAST(PRODUCTO_PROYECTO AS VARCHAR) as CUI, MAX(PRODUCTO_PROYECTO_NOMBRE) as Nombre,
+                       MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as COSTO_ACTUAL,
+                       SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as MONTO_EJECUCION_TOTAL
+                FROM 'seguimiento_inversiones.parquet'
+                WHERE CAST(SEC_EJEC AS VARCHAR) IN (SELECT DISTINCT CAST(SEC_EJEC AS VARCHAR) FROM '{PARQUET_FILE}' WHERE {where_clause})
+                AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
+                GROUP BY PRODUCTO_PROYECTO
+            ),
+            mef_current AS (
+                SELECT CAST(PRODUCTO_PROYECTO AS VARCHAR) as CUI,
                        SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as PIA,
                        SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as PIM,
                        SUM(TRY_CAST(MONTO_CERTIFICADO AS DOUBLE)) as Certificado,
@@ -581,41 +590,47 @@ with tab2:
                        SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) as Devengado
                 FROM '{PARQUET_FILE}'
                 WHERE {where_clause} AND CATEGORIA_GASTO = 6
-                AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
                 GROUP BY PRODUCTO_PROYECTO
-            )
-            SELECT 
-                m.CUI, m.Nombre, m.PIA, m.PIM, m.Certificado, m.Compromiso, m.Devengado as Gasto,
-                TRY_CAST(s.COSTO_ACTUAL AS DOUBLE) as "Costo Total (MEF)",
-                TRY_CAST(s.MONTO_EJECUCION_TOTAL AS DOUBLE) as "Devengado Histórico (MEF)",
-                ROUND(COALESCE((TRY_CAST(s.MONTO_EJECUCION_TOTAL AS DOUBLE) / NULLIF(TRY_CAST(s.COSTO_ACTUAL AS DOUBLE), 0)) * 100, (m.Devengado / NULLIF(m.PIM, 0)) * 100, 0), 1) as "Avance Financiero % (MEF)",
-                ROUND(TRY_CAST(i.AVANCE_FISICO_INFOBRAS AS DOUBLE), 1) as "Avance Físico % (INFOBRAS)",
-                i.Fecha_de_inicio_de_obra as "Fecha Inicio (INFOBRAS)",
-                i.Fecha_finalizaci_n_programada_de_obra as "Fecha Fin Prog. (INFOBRAS)",
-                COALESCE(i.Tiene_Liquidacion, 'No') as "Liquidada",
-                i.Fecha_Liquidacion as "Fecha Liquidación",
-                COALESCE(TRY_CAST(p.ES_PARALIZADA AS INTEGER), 0) as "Paralizada"
-            FROM mef_data m
-            LEFT JOIN (
-                SELECT CUI_INFOBRAS, 
+            ),
+            infobras AS (
+                SELECT CAST(CUI_INFOBRAS AS VARCHAR) as CUI_INFOBRAS, 
+                       MAX(Nombre_de_obra) as Nombre_INFOBRAS,
                        MAX(TRY_CAST(AVANCE_FISICO_INFOBRAS AS DOUBLE)) as AVANCE_FISICO_INFOBRAS,
                        MAX(Fecha_de_inicio_de_obra) as Fecha_de_inicio_de_obra,
                        MAX(Fecha_finalizaci_n_programada_de_obra) as Fecha_finalizaci_n_programada_de_obra,
                        MAX(TRY_CAST(_Tiene_liquidaci_n_de_obra_ AS VARCHAR)) as Tiene_Liquidacion,
                        MAX(Fecha_de_aprobaci_n_de_liquidaci_n_de_obra) as Fecha_Liquidacion
                 FROM 'infobras_avance.parquet' 
+                -- We select all projects because the user filters by entity name loosely anyway
                 GROUP BY 1
-            ) i ON m.CUI = i.CUI_INFOBRAS
-            LEFT JOIN (
-                SELECT PRODUCTO_PROYECTO, MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as COSTO_ACTUAL, SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as MONTO_EJECUCION_TOTAL 
-                FROM 'seguimiento_inversiones.parquet' 
-                GROUP BY 1
-            ) s ON m.CUI = s.PRODUCTO_PROYECTO
-            LEFT JOIN (
-                SELECT CUI_PARALIZADA, MAX(TRY_CAST(ES_PARALIZADA AS INTEGER)) as ES_PARALIZADA 
+            ),
+            paralizadas AS (
+                SELECT CAST(CUI_PARALIZADA AS VARCHAR) as CUI_PARALIZADA, MAX(TRY_CAST(ES_PARALIZADA AS INTEGER)) as ES_PARALIZADA 
                 FROM 'infobras_paralizadas.parquet' 
                 GROUP BY 1
-            ) p ON m.CUI = p.CUI_PARALIZADA
+            )
+            SELECT 
+                COALESCE(s.CUI, i.CUI_INFOBRAS) as CUI, 
+                COALESCE(s.Nombre, i.Nombre_INFOBRAS) as Nombre, 
+                COALESCE(m.PIA, 0) as PIA, 
+                COALESCE(m.PIM, 0) as PIM, 
+                COALESCE(m.Certificado, 0) as Certificado, 
+                COALESCE(m.Compromiso, 0) as Compromiso, 
+                COALESCE(m.Devengado, 0) as Gasto,
+                s.COSTO_ACTUAL as "Costo Total (MEF)",
+                s.MONTO_EJECUCION_TOTAL as "Devengado Histórico (MEF)",
+                ROUND(COALESCE((s.MONTO_EJECUCION_TOTAL / NULLIF(s.COSTO_ACTUAL, 0)) * 100, 0), 1) as "Avance Financiero % (MEF)",
+                ROUND(TRY_CAST(i.AVANCE_FISICO_INFOBRAS AS DOUBLE), 1) as "Avance Físico % (INFOBRAS)",
+                i.Fecha_de_inicio_de_obra as "Fecha Inicio (INFOBRAS)",
+                i.Fecha_finalizaci_n_programada_de_obra as "Fecha Fin Prog. (INFOBRAS)",
+                COALESCE(i.Tiene_Liquidacion, 'No') as "Liquidada",
+                i.Fecha_Liquidacion as "Fecha Liquidación",
+                COALESCE(p.ES_PARALIZADA, 0) as "Paralizada"
+            FROM ssi s
+            FULL OUTER JOIN infobras i ON s.CUI = i.CUI_INFOBRAS
+            LEFT JOIN mef_current m ON COALESCE(s.CUI, i.CUI_INFOBRAS) = m.CUI
+            LEFT JOIN paralizadas p ON COALESCE(s.CUI, i.CUI_INFOBRAS) = p.CUI_PARALIZADA
+            WHERE (s.CUI IS NOT NULL OR (i.CUI_INFOBRAS IS NOT NULL AND i.Nombre_INFOBRAS LIKE '%CHUMBIVILCAS%'))
         """
         df_vs = conn.execute(vs_query).df()
         
