@@ -652,14 +652,29 @@ with tab2:
                 ]
                 filtro_tabla = st.selectbox("🔍 **Estado de la Obra:**", opciones_estado)
             with fc2:
-                lista_gestiones = ["Todas las Gestiones"] + sorted([g for g in df_vs['Gestión de Origen'].unique() if g != "Indeterminada"], reverse=True) + ["Indeterminada"]
-                filtro_gestion = st.selectbox("🏛️ **Gestión (Origen):**", lista_gestiones)
+                gestiones_counts = df_vs['Gestión de Origen'].value_counts()
+                lista_gestiones = [f"Todas las Gestiones ({len(df_vs)})"]
+                for g in sorted([g for g in df_vs['Gestión de Origen'].unique() if g != "Indeterminada"], reverse=True):
+                    lista_gestiones.append(f"{g} ({gestiones_counts.get(g, 0)})")
+                lista_gestiones.append(f"Indeterminada ({gestiones_counts.get('Indeterminada', 0)})")
+                filtro_gestion_raw = st.selectbox("🏛️ **Gestión (Origen):**", lista_gestiones)
+                filtro_gestion = filtro_gestion_raw.split(" (")[0]
             with fc3:
-                lista_plazos = ["Todos los Plazos", "Plazo Vencido (Retraso/Liquidación)", "En Plazo (Vigente)", "Sin Cronograma"]
-                filtro_plazo = st.selectbox("⏳ **Vigencia del Plazo:**", lista_plazos)
+                plazo_counts = df_vs['Estado del Plazo'].value_counts()
+                lista_plazos = [
+                    f"Todos los Plazos ({len(df_vs)})", 
+                    f"Plazo Vencido (Retraso/Liquidación) ({plazo_counts.get('Plazo Vencido (Retraso/Liquidación)', 0)})", 
+                    f"En Plazo (Vigente) ({plazo_counts.get('En Plazo (Vigente)', 0)})", 
+                    f"Sin Cronograma ({plazo_counts.get('Sin Cronograma', 0)})"
+                ]
+                filtro_plazo_raw = st.selectbox("⏳ **Vigencia del Plazo:**", lista_plazos)
+                filtro_plazo = filtro_plazo_raw.split(" (")[0]
             with fc4:
-                lista_liq = ["Todas las Obras", "Liquidadas (Cerradas)", "No Liquidadas (Abiertas)"]
-                filtro_liq = st.selectbox("📄 **Liquidación:**", lista_liq)
+                liq_count = len(df_vs[df_vs['Liquidada'] == 'Si'])
+                noliq_count = len(df_vs[df_vs['Liquidada'] != 'Si'])
+                lista_liq = [f"Todas las Obras ({len(df_vs)})", f"Liquidadas (Cerradas) ({liq_count})", f"No Liquidadas (Abiertas) ({noliq_count})"]
+                filtro_liq_raw = st.selectbox("📄 **Liquidación:**", lista_liq)
+                filtro_liq = filtro_liq_raw.split(" (")[0]
                 
             # 3. Aplicar Filtros al DataFrame principal (df_filtered)
             df_filtered = df_vs.copy()
@@ -668,7 +683,7 @@ with tab2:
             
             if "Paralizadas" in filtro_tabla:
                 df_filtered = df_filtered[df_filtered['Paralizada'] == 1]
-            elif "Desbalance" in filtro_tabla:
+            elif "Desfase Crítico" in filtro_tabla:
                 df_filtered = df_filtered[df_filtered['Desbalance'] > 30]
                 
             if filtro_gestion != "Todas las Gestiones":
