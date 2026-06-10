@@ -39,32 +39,51 @@ def convert_ssi():
     in_path = os.path.join(folder, "2026-Seguimiento-PI.csv")
     out_path = os.path.join(out_folder, "seguimiento_inversiones.parquet")
     if os.path.exists(in_path):
-        print(f"Convirtiendo {in_path} a Parquet...")
+        print(f"Convirtiendo y fusionando {in_path} con el historial...")
         start = time.time()
-        query = f"""
-        COPY (
-            SELECT * FROM read_csv_auto('{in_path}', all_varchar=true, ignore_errors=true)
-        ) TO '{out_path}' (FORMAT PARQUET)
-        """
+        
         try:
-            conn.execute(query)
+            # 1. Cargar el nuevo CSV a una tabla temporal
+            conn.execute(f"CREATE OR REPLACE TABLE ssi_nuevo AS SELECT * FROM read_csv_auto('{in_path}', all_varchar=true, ignore_errors=true)")
             
-            # --- INYECTAR FECHAS HISTÓRICAS AUTOMÁTICAMENTE ---
+            # 2. Unir con el historial existente (si existe) y deduplicar
+            if os.path.exists(out_path):
+                print("   -> Detectado historial previo. Actualizando...")
+                # Agregamos las columnas necesarias del nuevo, y del viejo
+                conn.execute(f"""
+                CREATE OR REPLACE TABLE ssi_combinado AS
+                SELECT PRODUCTO_PROYECTO, MAX(PRODUCTO_PROYECTO_NOMBRE) as PRODUCTO_PROYECTO_NOMBRE,
+                       MAX(COSTO_ACTUAL) as COSTO_ACTUAL, MAX(MONTO_EJECUCION_TOTAL) as MONTO_EJECUCION_TOTAL,
+                       MAX(SEC_EJEC) as SEC_EJEC
+                FROM (
+                    SELECT CAST(PRODUCTO_PROYECTO AS VARCHAR) as PRODUCTO_PROYECTO, CAST(PRODUCTO_PROYECTO_NOMBRE AS VARCHAR) as PRODUCTO_PROYECTO_NOMBRE, CAST(COSTO_ACTUAL AS VARCHAR) as COSTO_ACTUAL, CAST(MONTO_EJECUCION_TOTAL AS VARCHAR) as MONTO_EJECUCION_TOTAL, CAST(SEC_EJEC AS VARCHAR) as SEC_EJEC FROM ssi_nuevo
+                    UNION ALL
+                    SELECT CAST(PRODUCTO_PROYECTO AS VARCHAR), CAST(PRODUCTO_PROYECTO_NOMBRE AS VARCHAR), CAST(COSTO_ACTUAL AS VARCHAR), CAST(MONTO_EJECUCION_TOTAL AS VARCHAR), CAST(SEC_EJEC AS VARCHAR) FROM '{out_path}'
+                )
+                GROUP BY PRODUCTO_PROYECTO
+                """)
+            else:
+                conn.execute("CREATE OR REPLACE TABLE ssi_combinado AS SELECT PRODUCTO_PROYECTO, PRODUCTO_PROYECTO_NOMBRE, COSTO_ACTUAL, MONTO_EJECUCION_TOTAL, SEC_EJEC FROM ssi_nuevo")
+
+            # 3. Inyectar fechas
             fechas_path = os.path.join(out_folder, "fechas_inicio_mef.parquet")
             if os.path.exists(fechas_path):
                 print("   -> Integrando historial de Anio_Inicio_MEF...")
                 conn.execute(f"""
                 CREATE OR REPLACE TABLE ssi_temp AS
                 SELECT s.*, f.Anio_Inicio_MEF
-                FROM '{out_path}' s
+                FROM ssi_combinado s
                 LEFT JOIN '{fechas_path}' f ON s.PRODUCTO_PROYECTO = f.CUI
                 """)
-                conn.execute(f"COPY ssi_temp TO '{out_path}' (FORMAT PARQUET)")
-                conn.execute("DROP TABLE ssi_temp")
-            # --------------------------------------------------
+            else:
+                conn.execute("CREATE OR REPLACE TABLE ssi_temp AS SELECT * FROM ssi_combinado")
+            
+            # Guardar
+            conn.execute(f"COPY ssi_temp TO '{out_path}' (FORMAT PARQUET)")
+            conn.execute("DROP TABLE ssi_temp; DROP TABLE ssi_combinado; DROP TABLE ssi_nuevo;")
             
             size_mb = os.path.getsize(out_path) / (1024 * 1024)
-            print(f"OK: seguimiento_inversiones.parquet ({size_mb:.2f} MB) en {time.time() - start:.2f}s")
+            print(f"OK: seguimiento_inversiones.parquet histórico ({size_mb:.2f} MB) en {time.time() - start:.2f}s")
         except Exception as e:
             print(f"Error con SSI: {e}")
 
