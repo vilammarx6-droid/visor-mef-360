@@ -584,130 +584,7 @@ with tab2:
                 except:
                     return "Sin Cronograma"
             df_vs['Estado del Plazo'] = df_vs['Fecha Fin Prog. (INFOBRAS)'].apply(asignar_estado_plazo)
-            # RESUMEN EJECUTIVO (KPIs)
-            total_obras = len(df_vs)
-            obras_sin_reporte = int(df_vs['Avance Físico % (INFOBRAS)'].isna().sum())
-            paralizadas = int(df_vs['Paralizada'].sum())
-            criticas = len(df_vs[df_vs['Desbalance'] > 30])
-            dinero_riesgo = df_vs[(df_vs['Paralizada'] == 1) | (df_vs['Desbalance'] > 30)]['PIM'].sum()
-            obras_vencidas = len(df_vs[df_vs['Estado del Plazo'] == 'Plazo Vencido (Retraso/Liquidación)'])
-            dinero_vencido = df_vs[df_vs['Estado del Plazo'] == 'Plazo Vencido (Retraso/Liquidación)']['PIM'].sum()
-            
-            st.markdown(f'<p style="font-size:14px; font-weight:600; color:#3b82f6;">Total de Obras Analizadas en este cruce de datos: {total_obras}</p>', unsafe_allow_html=True)
-            
-            sc1, sc2, sc3 = st.columns(3)
-            with sc1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #000;"><div class="kpi-title">Obras Paralizadas (INFOBRAS)</div><div class="kpi-value" style="color:#000;">{paralizadas}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras oficialmente reportadas como detenidas en la Contraloría.</div></div>', unsafe_allow_html=True)
-            with sc2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #ef4444;"><div class="kpi-title">Obras con Desfase Crítico</div><div class="kpi-value" style="color:#ef4444;">{criticas}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Brecha entre avance financiero y físico > 30%.</div></div>', unsafe_allow_html=True)
-            with sc3: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #f59e0b;"><div class="kpi-title">Dinero en Riesgo (Desfase)</div><div class="kpi-value" style="color:#f59e0b;">S/ {dinero_riesgo/1e6:,.1f} M</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Presupuesto ({CURRENT_YEAR}) de obras paralizadas o con gran desfase.</div></div>', unsafe_allow_html=True)
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            sc_ghost1, sc_ghost2 = st.columns(2)
-            with sc_ghost1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Obras "Fantasmas" (Plazo Vencido)</div><div class="kpi-value" style="color:#8b5cf6;">{obras_vencidas}</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Obras que debieron terminar en 2025 o antes, pero siguen activas en el presupuesto.</div></div>', unsafe_allow_html=True)
-            with sc_ghost2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Presupuesto Absorbido (Obras Vencidas)</div><div class="kpi-value" style="color:#8b5cf6;">S/ {dinero_vencido/1e6:,.1f} M</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Dinero que siguen "chupando" hoy las obras que legalmente ya debieron entregarse.</div></div>', unsafe_allow_html=True)
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            # Gráficos MACRO (Promedios y Gestiones)
-            col_macro, col_gest = st.columns(2)
-            
-            with col_macro:
-                st.markdown('<div class="card-white" style="height:350px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">📊 Resumen General: Físico vs Financiero</h4>', unsafe_allow_html=True)
-                if not df_vs.empty:
-                    # 1. Avance Financiero Global (Ponderado)
-                    suma_costo = df_vs['Costo Total (MEF)'].fillna(df_vs['PIM']).sum()
-                    suma_devengado = df_vs['Devengado Histórico (MEF)'].sum()
-                    avg_fin = (suma_devengado / suma_costo) * 100 if suma_costo > 0 else 0
-                    
-                    # 2. Avance Físico Global (Ponderado)
-                    df_fis = df_vs.copy()
-                    df_fis['Avance Físico % (INFOBRAS)'] = df_fis['Avance Físico % (INFOBRAS)'].fillna(0)
-                    df_fis['Peso'] = df_fis['Costo Total (MEF)'].fillna(df_fis['PIM'])
-                    suma_peso_fisico = df_fis['Peso'].sum()
-                    avg_fis = (df_fis['Avance Físico % (INFOBRAS)'] * df_fis['Peso']).sum() / suma_peso_fisico if suma_peso_fisico > 0 else 0
-                    
-                    import pandas as pd
-                    df_macro = pd.DataFrame({
-                        'Indicador': ['1. Plata Pagada<br>(Av. Financiero)', '2. Construcción Real<br>(Av. Físico)'],
-                        'Porcentaje Promedio': [avg_fin, avg_fis]
-                    })
-                    
-                    fig_bar_macro = px.bar(
-                        df_macro, x='Porcentaje Promedio', y='Indicador', orientation='h',
-                        color='Indicador', 
-                        color_discrete_map={'1. Plata Pagada<br>(Av. Financiero)': '#ef4444', '2. Construcción Real<br>(Av. Físico)': '#3b82f6'},
-                        text='Porcentaje Promedio'
-                    )
-                    fig_bar_macro.update_traces(
-                        texttemplate='<b>%{text:.1f}%</b>', 
-                        textposition='auto', 
-                        textfont_size=16, 
-                        textfont_color='white'
-                    )
-                    fig_bar_macro.update_layout(
-                        xaxis=dict(range=[0, max(100, max(avg_fin, avg_fis) + 10)]),
-                        margin=dict(t=20, l=10, r=20, b=20),
-                        height=250,
-                        showlegend=False
-                    )
-                    st.plotly_chart(fig_bar_macro, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.info("No hay datos.")
-                st.markdown('</div>', unsafe_allow_html=True)
-                
-            with col_gest:
-                st.markdown('<div class="card-white" style="height:350px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">🏛️ Cantidad de Obras por Gestión (Origen)</h4>', unsafe_allow_html=True)
-                if not df_vs.empty:
-                    df_gest = df_vs['Gestión de Origen'].value_counts().reset_index()
-                    df_gest.columns = ['Gestión', 'Cantidad de Obras']
-                    # Sort to show newest first, except Indeterminada
-                    df_gest = df_gest.sort_values(by="Gestión", ascending=False)
-                    
-                    fig_gest = px.bar(
-                        df_gest, x='Cantidad de Obras', y='Gestión', orientation='h',
-                        color='Cantidad de Obras', color_continuous_scale='Purp',
-                        text='Cantidad de Obras'
-                    )
-                    fig_gest.update_traces(textposition='outside')
-                    fig_gest.update_layout(
-                        margin=dict(t=20, l=10, r=40, b=20),
-                        height=250,
-                        showlegend=False,
-                        coloraxis_showscale=False
-                    )
-                    st.plotly_chart(fig_gest, use_container_width=True, config={'displayModeBar': False})
-                else:
-                    st.info("No hay datos.")
-                st.markdown('</div>', unsafe_allow_html=True)
-            
-            st.markdown('<br>', unsafe_allow_html=True)
-            
-            if not df_vs.empty:
-                st.markdown('<div class="card-white" style="margin-top:10px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">⚖️ Desempeño Promedio por Gestión (Avance Físico vs Avance Financiero)</h4>', unsafe_allow_html=True)
-                
-                # Promedio simple por cada gestión
-                df_gest_perf = df_vs.groupby('Gestión de Origen')[['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)']].mean().reset_index()
-                df_gest_perf = df_gest_perf.sort_values(by="Gestión de Origen", ascending=False)
-                
-                df_gest_long = pd.melt(df_gest_perf, id_vars=['Gestión de Origen'], value_vars=['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)'], var_name='Tipo de Avance', value_name='Porcentaje Promedio')
-                df_gest_long['Tipo de Avance'] = df_gest_long['Tipo de Avance'].replace({'Avance Financiero % (MEF)': 'Avance Financiero', 'Avance Físico % (INFOBRAS)': 'Avance Físico'})
-                
-                fig_gest_perf = px.bar(
-                    df_gest_long, x='Porcentaje Promedio', y='Gestión de Origen', color='Tipo de Avance', barmode='group', orientation='h',
-                    color_discrete_map={'Avance Financiero': '#ef4444', 'Avance Físico': '#3b82f6'},
-                    text='Porcentaje Promedio'
-                )
-                fig_gest_perf.update_traces(texttemplate='<b>%{text:.1f}%</b>', textposition='outside')
-                fig_gest_perf.update_layout(
-                    xaxis=dict(range=[0, 115]),
-                    margin=dict(t=20, l=10, r=40, b=20),
-                    height=300,
-                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None)
-                )
-                st.plotly_chart(fig_gest_perf, use_container_width=True, config={'displayModeBar': False})
-                st.markdown('</div><br>', unsafe_allow_html=True)
-            
-            # Tabla Resumen de Sobrecostos e Irregularidades (Sin límites)
-            st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Súper Tabla de Gastos vs Avance Físico</h4>', unsafe_allow_html=True)
-            
+            # 1. Metodología Expandida (Arriba)
             with st.expander("📖 Clic aquí para ver la Metodología Matemática y Fórmulas de Auditoría"):
                 st.markdown("""
                 <div style='background-color: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 14px; color: #334155;'>
@@ -730,14 +607,15 @@ with tab2:
                 </div>
                 """, unsafe_allow_html=True)
             
-            # Filtro interactivo para la tabla basado en los KPIs
+            # 2. UI de Filtros Interactivos (Arriba de los gráficos)
+            st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Filtros de Auditoría Ciudadana</h4>', unsafe_allow_html=True)
             fc1, fc2, fc3 = st.columns([1, 1, 1])
             with fc1:
                 filtro_tabla = st.radio(
                     "🔍 **Filtro de Estado de la Obra:**",
-                    [f"🔵 Todas las Obras ({total_obras})", 
-                     f"⚫ SOLO Paralizadas ({paralizadas})", 
-                     f"🔴 SOLO con Desfase Crítico ({criticas})"],
+                    [f"🔵 Todas las Obras ({len(df_vs)})", 
+                     f"⚫ SOLO Paralizadas ({int(df_vs['Paralizada'].sum())})", 
+                     f"🔴 SOLO con Desfase Crítico ({len(df_vs[df_vs['Desbalance'] > 30])})"],
                     horizontal=True,
                     key="filtro_kpi_radio"
                 )
@@ -747,23 +625,154 @@ with tab2:
             with fc3:
                 lista_plazos = ["Todos los Plazos", "Plazo Vencido (Retraso/Liquidación)", "En Plazo (Vigente)", "Sin Cronograma"]
                 filtro_plazo = st.selectbox("⏳ **Filtro por Vigencia del Plazo:**", lista_plazos)
-            
-            df_table = df_vs.copy()
-            if 'Gasto' in df_table.columns:
-                df_table.rename(columns={'Gasto': f'Gasto ({CURRENT_YEAR})'}, inplace=True)
+                
+            # 3. Aplicar Filtros al DataFrame principal (df_filtered)
+            df_filtered = df_vs.copy()
+            if 'Gasto' in df_filtered.columns:
+                df_filtered.rename(columns={'Gasto': f'Gasto ({CURRENT_YEAR})'}, inplace=True)
             
             if "Paralizadas" in filtro_tabla:
-                df_table = df_table[df_table['Paralizada'] == 1]
+                df_filtered = df_filtered[df_filtered['Paralizada'] == 1]
             elif "Desbalance" in filtro_tabla:
-                df_table = df_table[df_table['Desbalance'] > 30]
+                df_filtered = df_filtered[df_filtered['Desbalance'] > 30]
                 
             if filtro_gestion != "Todas las Gestiones":
-                df_table = df_table[df_table['Gestión de Origen'] == filtro_gestion]
+                df_filtered = df_filtered[df_filtered['Gestión de Origen'] == filtro_gestion]
                 
             if filtro_plazo != "Todos los Plazos":
-                df_table = df_table[df_table['Estado del Plazo'] == filtro_plazo]
+                df_filtered = df_filtered[df_filtered['Estado del Plazo'] == filtro_plazo]
                 
-            df_table = df_table.sort_values(by="Desbalance", ascending=False)
+            # 4. Calcular KPIs basados en el DF filtrado
+            total_obras_f = len(df_filtered)
+            paralizadas_f = int(df_filtered['Paralizada'].sum())
+            criticas_f = len(df_filtered[df_filtered['Desbalance'] > 30])
+            dinero_riesgo_f = df_filtered[(df_filtered['Paralizada'] == 1) | (df_filtered['Desbalance'] > 30)]['PIM'].sum()
+            obras_vencidas_f = len(df_filtered[df_filtered['Estado del Plazo'] == 'Plazo Vencido (Retraso/Liquidación)'])
+            dinero_vencido_f = df_filtered[df_filtered['Estado del Plazo'] == 'Plazo Vencido (Retraso/Liquidación)']['PIM'].sum()
+            
+            st.markdown(f'<p style="font-size:14px; font-weight:600; color:#3b82f6;">Total de Obras Analizadas en esta vista: {total_obras_f}</p>', unsafe_allow_html=True)
+            
+            sc1, sc2, sc3 = st.columns(3)
+            with sc1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #000;"><div class="kpi-title">Obras Paralizadas (INFOBRAS)</div><div class="kpi-value" style="color:#000;">{paralizadas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Obras oficialmente reportadas como detenidas en la Contraloría.</div></div>', unsafe_allow_html=True)
+            with sc2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #ef4444;"><div class="kpi-title">Obras con Desfase Crítico</div><div class="kpi-value" style="color:#ef4444;">{criticas_f}</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Brecha entre avance financiero y físico > 30%.</div></div>', unsafe_allow_html=True)
+            with sc3: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #f59e0b;"><div class="kpi-title">Dinero en Riesgo (Desfase)</div><div class="kpi-value" style="color:#f59e0b;">S/ {dinero_riesgo_f/1e6:,.1f} M</div><div style="font-size:11px; color:#64748b; margin-top:5px; line-height:1.2;">Presupuesto ({CURRENT_YEAR}) de obras paralizadas o con gran desfase.</div></div>', unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            sc_ghost1, sc_ghost2 = st.columns(2)
+            with sc_ghost1: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Obras "Fantasmas" (Plazo Vencido)</div><div class="kpi-value" style="color:#8b5cf6;">{obras_vencidas_f}</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Obras que debieron terminar en 2025 o antes, pero siguen activas en el presupuesto.</div></div>', unsafe_allow_html=True)
+            with sc_ghost2: st.markdown(f'<div class="kpi-container" style="border-left: 5px solid #8b5cf6; background-color:#faf5ff;"><div class="kpi-title">Presupuesto Absorbido (Obras Vencidas)</div><div class="kpi-value" style="color:#8b5cf6;">S/ {dinero_vencido_f/1e6:,.1f} M</div><div style="font-size:12px; color:#64748b; margin-top:5px; line-height:1.3;">Dinero que siguen "chupando" hoy las obras que legalmente ya debieron entregarse.</div></div>', unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # 5. Gráficos MACRO basados en df_filtered
+            col_macro, col_gest = st.columns(2)
+            
+            with col_macro:
+                st.markdown('<div class="card-white" style="height:350px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">📊 Resumen General: Físico vs Financiero</h4>', unsafe_allow_html=True)
+                if not df_filtered.empty:
+                    # 1. Avance Financiero Global (Ponderado)
+                    suma_costo = df_filtered['Costo Total (MEF)'].fillna(df_filtered['PIM']).sum()
+                    suma_devengado = df_filtered['Devengado Histórico (MEF)'].sum()
+                    avg_fin = (suma_devengado / suma_costo) * 100 if suma_costo > 0 else 0
+                    
+                    # 2. Avance Físico Global (Ponderado)
+                    df_fis = df_filtered.copy()
+                    df_fis['Avance Físico % (INFOBRAS)'] = df_fis['Avance Físico % (INFOBRAS)'].fillna(0)
+                    df_fis['Peso'] = df_fis['Costo Total (MEF)'].fillna(df_fis['PIM'])
+                    suma_peso_fisico = df_fis['Peso'].sum()
+                    avg_fis = (df_fis['Avance Físico % (INFOBRAS)'] * df_fis['Peso']).sum() / suma_peso_fisico if suma_peso_fisico > 0 else 0
+                    
+                    import pandas as pd
+                    df_macro = pd.DataFrame({
+                        'Indicador': ['1. Plata Pagada<br>(Av. Financiero)', '2. Construcción Real<br>(Av. Físico)'],
+                        'Porcentaje Promedio': [avg_fin, avg_fis]
+                    })
+                    
+                    fig_bar_macro = px.bar(
+                        df_macro, x='Porcentaje Promedio', y='Indicador', orientation='h',
+                        color='Indicador', 
+                        color_discrete_map={'1. Plata Pagada<br>(Av. Financiero)': '#ef4444', '2. Construcción Real<br>(Av. Físico)': '#3b82f6'},
+                        text='Porcentaje Promedio'
+                    )
+                    fig_bar_macro.update_traces(
+                        texttemplate='<b>%{text:.1f}%</b>', 
+                        textposition='auto', 
+                        textfont_size=16, 
+                        textfont_color='white',
+                        hovertemplate='<b>%{y}</b><br>Promedio: %{x:.1f}%<extra></extra>'
+                    )
+                    fig_bar_macro.update_layout(
+                        xaxis=dict(range=[0, max(100, max(avg_fin, avg_fis) + 10)]),
+                        margin=dict(t=20, l=10, r=20, b=20),
+                        height=250,
+                        showlegend=False
+                    )
+                    st.plotly_chart(fig_bar_macro, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("No hay datos que coincidan con los filtros.")
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+            with col_gest:
+                st.markdown('<div class="card-white" style="height:350px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">🏛️ Cantidad de Obras por Gestión (Origen)</h4>', unsafe_allow_html=True)
+                if not df_filtered.empty:
+                    df_gest = df_filtered['Gestión de Origen'].value_counts().reset_index()
+                    df_gest.columns = ['Gestión', 'Cantidad de Obras']
+                    df_gest = df_gest.sort_values(by="Gestión", ascending=False)
+                    
+                    fig_gest = px.bar(
+                        df_gest, x='Cantidad de Obras', y='Gestión', orientation='h',
+                        color='Cantidad de Obras', color_continuous_scale='Purp',
+                        text='Cantidad de Obras'
+                    )
+                    fig_gest.update_traces(
+                        textposition='outside',
+                        hovertemplate='<b>Gestión:</b> %{y}<br><b>Total:</b> %{x} Obras<extra></extra>'
+                    )
+                    fig_gest.update_layout(
+                        margin=dict(t=20, l=10, r=40, b=20),
+                        height=250,
+                        showlegend=False,
+                        coloraxis_showscale=False
+                    )
+                    st.plotly_chart(fig_gest, use_container_width=True, config={'displayModeBar': False})
+                else:
+                    st.info("No hay datos.")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('<br>', unsafe_allow_html=True)
+            
+            # 6. Desempeño Promedio por Gestión
+            if not df_filtered.empty:
+                st.markdown('<div class="card-white" style="margin-top:10px;"><h4 style="font-weight:bold; font-size:16px; color:#0f172a;">⚖️ Desempeño Promedio por Gestión (Avance Físico vs Avance Financiero)</h4>', unsafe_allow_html=True)
+                
+                df_gest_perf = df_filtered.groupby('Gestión de Origen')[['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)']].mean().reset_index()
+                df_gest_perf = df_gest_perf.sort_values(by="Gestión de Origen", ascending=False)
+                
+                df_gest_long = pd.melt(df_gest_perf, id_vars=['Gestión de Origen'], value_vars=['Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)'], var_name='Tipo de Avance', value_name='Porcentaje Promedio')
+                df_gest_long['Tipo de Avance'] = df_gest_long['Tipo de Avance'].replace({'Avance Financiero % (MEF)': 'Avance Financiero', 'Avance Físico % (INFOBRAS)': 'Avance Físico'})
+                
+                fig_gest_perf = px.bar(
+                    df_gest_long, x='Porcentaje Promedio', y='Gestión de Origen', color='Tipo de Avance', barmode='group', orientation='h',
+                    color_discrete_map={'Avance Financiero': '#ef4444', 'Avance Físico': '#3b82f6'},
+                    text='Porcentaje Promedio'
+                )
+                fig_gest_perf.update_traces(
+                    texttemplate='<b>%{text:.1f}%</b>', 
+                    textposition='outside',
+                    hovertemplate='<b>Gestión:</b> %{y}<br><b>Tipo:</b> %{data.name}<br><b>Promedio:</b> %{x:.1f}%<extra></extra>'
+                )
+                fig_gest_perf.update_layout(
+                    xaxis=dict(range=[0, 115]),
+                    margin=dict(t=20, l=10, r=40, b=20),
+                    height=300,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=None)
+                )
+                st.plotly_chart(fig_gest_perf, use_container_width=True, config={'displayModeBar': False})
+                st.markdown('</div><br>', unsafe_allow_html=True)
+            
+            # 7. Tabla Resumen de Sobrecostos e Irregularidades
+            st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Súper Tabla de Gastos vs Avance Físico</h4>', unsafe_allow_html=True)
+            
+            df_table = df_filtered.sort_values(by="Desbalance", ascending=False)
             
             if len(df_table) > 1000:
                 st.warning(f"⚠️ La lista contiene {len(df_table)} obras. Para no sobrecargar tu navegador, previsualizando el Top 1000 más crítico. ¡Si descargas el Excel se bajará completo!")
