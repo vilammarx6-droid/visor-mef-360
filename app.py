@@ -209,7 +209,8 @@ if st.sidebar.button("🔄 Forzar Actualización de Datos", help="Descarga la ú
                 os.remove(f)
             except:
                 pass
-        st.sidebar.success("Caché borrado. Recarga la página (F5) para descargar los datos nuevos.")
+        st.sidebar.success("Caché borrado. Descargando nuevos datos...")
+        st.rerun()
     except Exception as e:
         st.sidebar.error(f"Error: {e}")
 # ------------------------------
