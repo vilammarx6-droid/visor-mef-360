@@ -1312,7 +1312,8 @@ with tab2:
                                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                                 )
                                 fig.update_xaxes(dtick=1)
-                                with st.container(border=True):
+                                st.markdown("<hr style='margin-top:20px; margin-bottom:20px; border-top:1px dashed #cbd5e1;'>", unsafe_allow_html=True)
+                                with st.container():
                                     st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Variación del Costo vs Ejecución</div>', unsafe_allow_html=True)
                                     st.plotly_chart(fig, use_container_width=True)
                                 
@@ -1365,7 +1366,8 @@ with tab2:
                                 margin=dict(l=20, r=20, t=10, b=20),
                                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                             )
-                            with st.container(border=True):
+                            st.markdown("<hr style='margin-top:20px; margin-bottom:20px; border-top:1px dashed #cbd5e1;'>", unsafe_allow_html=True)
+                            with st.container():
                                 st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Avance Físico (Programado vs Real)</div>', unsafe_allow_html=True)
                                 st.plotly_chart(fig_fis, use_container_width=True)
                         else:
