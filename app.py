@@ -1302,11 +1302,24 @@ with tab2:
                                 
                                 # Extraer Costo Viable (Mínimo histórico sobreviviente)
                                 try:
-                                    q_viable = f"SELECT MIN(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as Costo_Viable FROM '{PARQUET_FILE}' WHERE PRODUCTO_PROYECTO = '{cui_code}' AND TRY_CAST(COSTO_ACTUAL AS DOUBLE) > 1000"
-                                    df_viable = conn.execute(q_viable).df()
-                                    costo_viable = df_viable['Costo_Viable'].iloc[0] if not df_viable.empty and not pd.isna(df_viable['Costo_Viable'].iloc[0]) else costo_ini
+                                    # We need to query the raw Seguimiento-PI files, not the Gasto-Diario file
+                                    viable_parts = []
+                                    for path in all_ssi_paths:
+                                        if path.endswith("-Seguimiento-PI.parquet") and int(path.split("-")[0]) >= 2024:
+                                            source = f"'{path}'" if os.path.exists(path) else f"read_parquet('https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{path}')"
+                                            viable_parts.append(f"SELECT MIN(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as Costo_Viable FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' AND TRY_CAST(COSTO_ACTUAL AS DOUBLE) > 1000")
+                                    
+                                    if viable_parts:
+                                        q_viable = " UNION ALL ".join(viable_parts)
+                                        df_viable = conn.execute(q_viable).df()
+                                        valid_viable = df_viable.dropna(subset=['Costo_Viable'])
+                                        valid_viable = valid_viable[valid_viable['Costo_Viable'] > 1000]
+                                        costo_viable = valid_viable['Costo_Viable'].min() if not valid_viable.empty else costo_ini
+                                    else:
+                                        costo_viable = costo_ini
+                                        
                                     var_total = ((costo_fin - costo_viable) / costo_viable * 100) if costo_viable > 0 else 0
-                                except:
+                                except Exception as e:
                                     costo_viable = costo_ini
                                     var_total = variacion
                                     
