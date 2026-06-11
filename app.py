@@ -247,7 +247,7 @@ if f_search:
     where_clause += f" AND (PRODUCTO_PROYECTO = '{_sch}' OR PRODUCTO_PROYECTO_NOMBRE LIKE '%{_sch.upper()}%')"
 
 if f_only_infobras:
-    where_clause += " AND PRODUCTO_PROYECTO IN (SELECT DISTINCT CUI_INFOBRAS FROM 'infobras_avance.parquet')"
+    where_clause += " AND PRODUCTO_PROYECTO IN (SELECT DISTINCT CAST(TRY_CAST(CUI_INFOBRAS AS BIGINT) AS VARCHAR) FROM 'infobras_avance.parquet')"
 
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
 st.sidebar.markdown("""
