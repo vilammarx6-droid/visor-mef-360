@@ -1299,13 +1299,24 @@ with tab2:
                                     año_fin = df_ssi_hist.iloc[-1]['Año']
                                     costo_fin = 0
                                     variacion = 0
-                                    
-                                var_color = "#ef4444" if variacion > 10 else "#22c55e" if variacion < 0 else "#64748b"
                                 
-                                c1, c2, c3 = st.columns(3)
-                                with c1: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #94a3b8;"><div class="kpi-title">Costo Inicial ({año_ini})</div><div class="kpi-value" style="color:#334155;">S/ {f_soles(costo_ini)}</div></div>', unsafe_allow_html=True)
-                                with c2: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #3b82f6;"><div class="kpi-title">Costo Actual ({año_fin})</div><div class="kpi-value" style="color:#334155;">S/ {f_soles(costo_fin)}</div></div>', unsafe_allow_html=True)
-                                with c3: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid {var_color};"><div class="kpi-title">Variación Histórica</div><div class="kpi-value" style="color:{var_color};">{variacion:+.1f}%</div></div>', unsafe_allow_html=True)
+                                # Extraer Costo Viable (Mínimo histórico sobreviviente)
+                                try:
+                                    q_viable = f"SELECT MIN(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as Costo_Viable FROM '{PARQUET_FILE}' WHERE PRODUCTO_PROYECTO = '{cui_code}' AND TRY_CAST(COSTO_ACTUAL AS DOUBLE) > 1000"
+                                    df_viable = conn.execute(q_viable).df()
+                                    costo_viable = df_viable['Costo_Viable'].iloc[0] if not df_viable.empty and not pd.isna(df_viable['Costo_Viable'].iloc[0]) else costo_ini
+                                    var_total = ((costo_fin - costo_viable) / costo_viable * 100) if costo_viable > 0 else 0
+                                except:
+                                    costo_viable = costo_ini
+                                    var_total = variacion
+                                    
+                                var_color = "#ef4444" if var_total > 10 else "#22c55e" if var_total < 0 else "#64748b"
+                                
+                                c1, c2, c3, c4 = st.columns(4)
+                                with c1: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #94a3b8;"><div class="kpi-title">Costo Viable (Original)</div><div class="kpi-value" style="color:#334155;">S/ {f_soles(costo_viable)}</div></div>', unsafe_allow_html=True)
+                                with c2: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #94a3b8; opacity: 0.8;"><div class="kpi-title">Reportado en {año_ini}</div><div class="kpi-value" style="color:#334155;">S/ {f_soles(costo_ini)}</div></div>', unsafe_allow_html=True)
+                                with c3: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #3b82f6;"><div class="kpi-title">Costo Actual ({año_fin})</div><div class="kpi-value" style="color:#334155;">S/ {f_soles(costo_fin)}</div></div>', unsafe_allow_html=True)
+                                with c4: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid {var_color};"><div class="kpi-title">Variación (Viable vs Actual)</div><div class="kpi-value" style="color:{var_color};">{var_total:+.1f}%</div></div>', unsafe_allow_html=True)
                                 st.markdown("<br>", unsafe_allow_html=True)
                                 
                                 import plotly.express as px
