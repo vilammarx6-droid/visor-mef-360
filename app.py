@@ -689,6 +689,7 @@ with tab2:
         
         if not df_vs.empty:
             import numpy as np
+
             
             df_vs['Desbalance'] = df_vs['Avance Financiero % (MEF)'] - df_vs['Avance Físico % (INFOBRAS)'].fillna(0)
             df_vs['Estado'] = np.where(df_vs['Paralizada']==1, "⚠️ PARALIZADA", 
@@ -974,7 +975,7 @@ with tab2:
 <div style="margin-bottom: 10px;">
 <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
 <span style="font-size: 12px; font-weight: 600; color: #475569;">1. Plata Pagada</span>
-<span style="font-size: 12px; font-weight: 800; color: #ef4444;">{av_fin:.1f}%</span>
+<span style="font-size: 12px; font-weight: 800; color: #ef4444;">{av_fin:,.1f}%</span>
 </div>
 <div style="width: 100%; background-color: #e2e8f0; border-radius: 4px; height: 8px; overflow: hidden;">
 <div style="width: {min(100, av_fin)}%; background-color: #ef4444; height: 100%; border-radius: 4px;"></div>
@@ -983,7 +984,7 @@ with tab2:
 <div style="margin-bottom: 0px;">
 <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
 <span style="font-size: 12px; font-weight: 600; color: #475569;">2. Construcción Real</span>
-<span style="font-size: 12px; font-weight: 800; color: #3b82f6;">{av_fis:.1f}%</span>
+<span style="font-size: 12px; font-weight: 800; color: #3b82f6;">{av_fis:,.1f}%</span>
 </div>
 <div style="width: 100%; background-color: #e2e8f0; border-radius: 4px; height: 8px; overflow: hidden;">
 <div style="width: {min(100, av_fis)}%; background-color: #3b82f6; height: 100%; border-radius: 4px;"></div>
@@ -991,10 +992,10 @@ with tab2:
 </div>
 </div>"""
                     
-                    html_gest_perf += '</div></div><div style="font-size: 12px; color: #64748b; margin-top: 5px;"><i>* Nota: Las obras "Sin Fecha Reportada" (por falta de datos en Infobras o por ser exclusivas del MEF) han sido excluidas de esta tabla comparativa para no sesgar los promedios de cada alcalde.</i></div>'
-                    st.markdown(html_gest_perf, unsafe_allow_html=True)
-                else:
-                    st.markdown('<div class="card-white" style="margin-bottom: 20px;"><span style="color:#64748b;">No hay datos suficientes con fechas de inicio válidas para calcular el desempeño por gestión.</span></div>', unsafe_allow_html=True)
+                html_gest_perf += '</div></div><div style="font-size: 12px; color: #64748b; margin-top: 5px;"><i>* Nota: Las obras "Sin Fecha Reportada" (por falta de datos en Infobras o por ser exclusivas del MEF) han sido excluidas de esta tabla comparativa para no sesgar los promedios de cada alcalde.</i></div>'
+                st.markdown(html_gest_perf, unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="card-white" style="margin-bottom: 20px;"><span style="color:#64748b;">No hay datos suficientes con fechas de inicio válidas para calcular el desempeño por gestión.</span></div>', unsafe_allow_html=True)
             
             # 7. Tabla Resumen de Sobrecostos e Irregularidades
             st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Súper Tabla de Gastos vs Avance Físico</h4>', unsafe_allow_html=True)
@@ -1014,7 +1015,7 @@ with tab2:
                 
             st.dataframe(
                 df_ui[['CUI', 'Nombre', 'Gestión de Origen', 'Estado del Plazo', 'Estado (INFOBRAS)', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
-                    "Costo Total (MEF)": "S/ {:,.0f}", "Devengado Histórico (MEF)": "S/ {:,.0f}", f"Gasto ({CURRENT_YEAR})": "S/ {:,.0f}", "Desbalance": "{:.1f}%", "Avance Financiero % (MEF)": "{:.1f}%", "Avance Físico % (INFOBRAS)": "{:.1f}%"
+                    "Costo Total (MEF)": "S/ {:,.0f}", "Devengado Histórico (MEF)": "S/ {:,.0f}", f"Gasto ({CURRENT_YEAR})": "S/ {:,.0f}", "Desbalance": "{:,.1f}%", "Avance Financiero % (MEF)": "{:,.1f}%", "Avance Físico % (INFOBRAS)": "{:,.1f}%"
                 }), use_container_width=True, hide_index=True, height=500
             )
             
