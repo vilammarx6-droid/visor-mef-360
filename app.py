@@ -590,7 +590,8 @@ with tab2:
                 SELECT CAST(PRODUCTO_PROYECTO AS VARCHAR) as CUI, MAX(PRODUCTO_PROYECTO_NOMBRE) as Nombre,
                        MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as COSTO_ACTUAL,
                        SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as MONTO_EJECUCION_TOTAL,
-                       MAX(TRY_CAST(Anio_Inicio_MEF AS INTEGER)) as Anio_Inicio_MEF
+                       MAX(TRY_CAST(Anio_Inicio_MEF AS INTEGER)) as Anio_Inicio_MEF,
+                       MAX(TRY_CAST(Anio_Fin_MEF AS INTEGER)) as Anio_Fin_MEF
                 FROM 'seguimiento_inversiones.parquet'
                 WHERE CAST(SEC_EJEC AS VARCHAR) IN (SELECT DISTINCT CAST(SEC_EJEC AS VARCHAR) FROM '{PARQUET_FILE}' WHERE {where_clause})
                 AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
