@@ -216,6 +216,13 @@ if f_sec_eje != "TODOS":
 st.sidebar.markdown("<br><hr style='margin-top:0px; margin-bottom:20px;'>", unsafe_allow_html=True)
 f_search = st.sidebar.text_input("🔎 Buscador libre de CUI o Nombre", "")
 
+import os
+if os.path.exists('infobras_avance.parquet'):
+    st.sidebar.markdown("<br>", unsafe_allow_html=True)
+    f_only_infobras = st.sidebar.toggle("🚧 Solo obras con Info en INFOBRAS", value=False, help="Filtra para mostrar únicamente los proyectos que tienen registros, fechas o avance reportado en INFOBRAS.")
+else:
+    f_only_infobras = False
+
 # --- BOTON DE ACTUALIZACION ---
 st.sidebar.markdown("<br><hr style='margin-top:0px; margin-bottom:10px;'>", unsafe_allow_html=True)
 if st.sidebar.button("🔄 Forzar Actualización de Datos", help="Descarga la última versión de los datos desde la nube (Hugging Face)."):
@@ -238,6 +245,9 @@ if st.sidebar.button("🔄 Forzar Actualización de Datos", help="Descarga la ú
 if f_search:
     _sch = f_search.strip().replace("'", "''")
     where_clause += f" AND (PRODUCTO_PROYECTO = '{_sch}' OR PRODUCTO_PROYECTO_NOMBRE LIKE '%{_sch.upper()}%')"
+
+if f_only_infobras:
+    where_clause += " AND PRODUCTO_PROYECTO IN (SELECT DISTINCT CUI_INFOBRAS FROM 'infobras_avance.parquet')"
 
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
 st.sidebar.markdown("""
@@ -1301,8 +1311,8 @@ with tab2:
                                 import plotly.graph_objects as go
                                 
                                 fig = go.Figure()
-                                fig.add_trace(go.Bar(x=df_ssi_hist['Año'], y=df_ssi_hist['Ejecucion_Total'], name='Ejecución Acumulada', marker_color='#94a3b8'))
-                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Costo_Actual'], mode='lines+markers', name='Costo Actual', line=dict(color='#ef4444', width=3)))
+                                fig.add_trace(go.Bar(x=df_ssi_hist['Año'], y=df_ssi_hist['Ejecucion_Total'], name='Ejecución', marker_color='#94a3b8', hovertemplate='S/ %{y:,.0f}<extra></extra>'))
+                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Costo_Actual'], mode='lines+markers', name='Costo', line=dict(color='#ef4444', width=3), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
                                 
                                 fig.update_layout(
                                     yaxis_title="Soles (S/)",
@@ -1355,8 +1365,8 @@ with tab2:
                         if not df_curva_fis.empty:
                             df_curva_fis['Fecha'] = df_curva_fis['Ano'].astype(str) + '-' + df_curva_fis['Mes'].astype(str).str.zfill(2)
                             fig_fis = go.Figure()
-                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Programado'], mode='lines', name='Avance Programado %', line=dict(color='#94a3b8', width=2, dash='dash')))
-                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Real'], mode='lines+markers', name='Avance Real %', line=dict(color='#3b82f6', width=3)))
+                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Programado'], mode='lines', name='Programado', line=dict(color='#94a3b8', width=2, dash='dash'), hovertemplate='%{y:.1f}%<extra></extra>'))
+                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Real'], mode='lines+markers', name='Real', line=dict(color='#3b82f6', width=3), hovertemplate='%{y:.1f}%<extra></extra>'))
                             
                             fig_fis.update_layout(
                                 yaxis_title="Porcentaje (%)",
