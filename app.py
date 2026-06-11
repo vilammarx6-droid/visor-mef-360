@@ -112,21 +112,34 @@ def get_latest_parquet_and_download():
         "infobras_paralizadas.parquet",
         "seguimiento_inversiones.parquet"
     ]
+    import time
     for file in files_to_download:
         if not os.path.exists(file):
             url = f"https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{file}"
             with st.spinner(f"Descargando {file} desde HuggingFace (Puede tardar 1-2 min)..."):
-                try:
-                    response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'}, timeout=300)
-                    if response.status_code == 200:
-                        with open(file, 'wb') as f:
-                            for chunk in response.iter_content(chunk_size=1024*1024): 
-                                if chunk:
-                                    f.write(chunk)
-                    else:
-                        st.error(f"⚠️ Error {response.status_code}: No se encontró '{file}' en HuggingFace.")
-                except Exception as e:
-                    st.error(f"Error descargando {file}: {e}")
+                success = False
+                for attempt in range(4):
+                    try:
+                        response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'}, timeout=120)
+                        if response.status_code == 200:
+                            with open(file, 'wb') as f:
+                                for chunk in response.iter_content(chunk_size=1024*1024): 
+                                    if chunk:
+                                        f.write(chunk)
+                            success = True
+                            break
+                        else:
+                            st.warning(f"Intento {attempt+1}: Código {response.status_code} al descargar {file}. Reintentando...")
+                            time.sleep(2)
+                    except Exception as e:
+                        if attempt < 3:
+                            st.warning(f"Intento {attempt+1} fallido por timeout. Reintentando...")
+                            time.sleep(2)
+                        else:
+                            st.error(f"Error fatal descargando {file} después de 4 intentos: {e}")
+                
+                if not success and not os.path.exists(file):
+                    st.error(f"⚠️ No se pudo descargar '{file}'. La plataforma podría fallar.")
                     
     return main_parquet
 
@@ -273,7 +286,7 @@ else:
     </div>
     """, unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Radiografía del Gasto", "⚖️ VERSUS: Físico vs Financiero (Obras)", "📋 Todas las Obras (SNIP)", "🔎 Detalle por Obra", "🏛️ Auditoría de Gestiones"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Radiografía del Gasto", "⚖️ VERSUS: Físico vs Financiero (Obras)", "📋 Todas las Obras (SNIP)", "🏛️ Auditoría de Gestiones"])
 
 # ---------------------------------------------------------
 # TAB 1: RADIOGRAFÍA DEL GASTO (Obras vs Burocracia)
@@ -1020,66 +1033,8 @@ with tab2:
 # ---------------------------------------------------------
 # TAB 3: LISTADO SNIP COMPLETO
 # ---------------------------------------------------------
-with tab3:
-    st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Base de Datos Completa de Proyectos (SNIP)</div>', unsafe_allow_html=True)
-    st.markdown("""
-    <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 15px; margin-bottom: 20px; border-radius: 4px; font-size: 13.5px; color: #475569;">
-    <strong>Guía de Lectura y Auditoría de Datos:</strong><br><br>
-    • <strong>Costo Inicial Planeado (PIA):</strong> Es el Presupuesto Institucional de Apertura. Cuánta plata se le asignó a la obra el 1 de enero. Es la promesa inicial.<br>
-    • <strong>Costo Inflado (PIM):</strong> Es el Presupuesto Institucional Modificado. Es la plata real que tiene la obra hoy, después de adendas, recortes o inyecciones de dinero.<br>
-    • <strong>Sobrecosto (Color Rojo):</strong> Se calcula restando <code>PIM - PIA</code>. Mide cuánto se ha inflado el presupuesto original. <strong style="color: #ef4444;">El color rojo se intensifica</strong> matemáticamente mientras más alto sea el sobrecosto. Si el número es negativo, significa que a la obra se le quitó presupuesto (recorte).<br>
-    • <strong>% Gasto Real (Termómetro Verde):</strong> Se calcula dividiendo <code>(Gasto Devengado ÷ PIM) × 100</code>. <strong style="color: #10b981;">Color Verde Oscuro</strong> significa que se ejecutó casi el 100% del dinero asignado para este año. Amarillo significa avance a medias, y Rojo/Blanco significa 0% de ejecución (estancamiento).<br><br>
-    <strong>🔍 Fuentes Oficiales:</strong><br>
-    Los datos de esta tabla son extraídos del <strong><a href="https://datosabiertos.mef.gob.pe/dataset/presupuesto-y-ejecucion-de-gasto" target="_blank">Gasto Diario (SIAF) del MEF</a></strong>. Las columnas procesadas corresponden exactamente a <code>MONTO_PIA</code>, <code>MONTO_PIM</code> y <code>MONTO_DEVENGADO</code>.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    list_query = f"""
-        SELECT 
-            PRODUCTO_PROYECTO as "CUI",
-            MAX(PRODUCTO_PROYECTO_NOMBRE) as "Nombre del Proyecto de Inversión",
-            CASE WHEN SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) > 0 THEN ROUND((SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) / SUM(TRY_CAST(MONTO_PIM AS DOUBLE))) * 100, 1) ELSE 0 END as "% Gasto Real",
-            SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as "Costo Inicial Planeado (PIA)",
-            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as "Costo Inflado (PIM)",
-            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) - SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as "Sobrecosto"
-        FROM '{PARQUET_FILE}'
-        WHERE {where_clause} AND CATEGORIA_GASTO = 6
-        AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
-        GROUP BY PRODUCTO_PROYECTO
-        ORDER BY "Costo Inflado (PIM)" DESC
-    """
-    df_list = conn.execute(list_query).df()
-    
-    if not df_list.empty:
-        import pandas as pd
-        pd.set_option("styler.render.max_elements", 2000000)
-        
-        # Para evitar que el navegador del usuario colapse al renderizar 45,000 colores,
-        # limitamos la previsualización a los 1500 proyectos más costosos si estamos en vista Macro.
-        df_display = df_list.copy()
-        if len(df_display) > 1000:
-            st.warning(f"⚠️ La base de datos tiene {len(df_list)} proyectos. Para mantener la plataforma rápida, se están previsualizando solo los primeros 1000 registros. ¡Utiliza el botón de descarga abajo para obtener el Excel con TODOS los datos completos!")
-            df_display = df_display.head(1000)
-            
-        styler = df_display.style.format({
-            "% Gasto Real": "{:.1f}%",
-            "Costo Inicial Planeado (PIA)": "S/ {:,.0f}",
-            "Costo Inflado (PIM)": "S/ {:,.0f}",
-            "Sobrecosto": "S/ {:,.0f}"
-        }).background_gradient(subset=["% Gasto Real"], cmap="RdYlGn", vmin=0, vmax=100) \
-          .background_gradient(subset=["Sobrecosto"], cmap="Reds")
-          
-        st.dataframe(styler, use_container_width=True, hide_index=True)
-        
-        # Botón para descargar el dataset completo
-        csv_full = df_list.to_csv(index=False).encode('utf-8-sig')
-        st.download_button("📥 Descargar Base de Datos SNIP Completa (Excel)", data=csv_full, file_name="todas_las_obras_snip.csv", mime="text/csv")
 
-# ------------------------------------------
-# TAB 4: DETALLE POR OBRA (RADIOGRAFÍA FINANCIERA)
-# ------------------------------------------
-with tab4:
+    st.markdown('<hr style="border:2px solid #cbd5e1; margin-top:50px; margin-bottom:50px;">', unsafe_allow_html=True)
     st.markdown("### 🔎 Radiografía Financiera de la Obra")
     st.markdown("Desglose a nivel de centavos de los rubros en los que gasta una obra específica.")
     
@@ -1499,7 +1454,67 @@ with tab4:
 # ---------------------------------------------------------
 # TAB 5: AUDITORÍA HISTÓRICA DE GESTIONES
 # ---------------------------------------------------------
-with tab5:
+
+with tab3:
+    st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Base de Datos Completa de Proyectos (SNIP)</div>', unsafe_allow_html=True)
+    st.markdown("""
+    <div style="background-color: #f8fafc; border-left: 4px solid #3b82f6; padding: 15px; margin-bottom: 20px; border-radius: 4px; font-size: 13.5px; color: #475569;">
+    <strong>Guía de Lectura y Auditoría de Datos:</strong><br><br>
+    • <strong>Costo Inicial Planeado (PIA):</strong> Es el Presupuesto Institucional de Apertura. Cuánta plata se le asignó a la obra el 1 de enero. Es la promesa inicial.<br>
+    • <strong>Costo Inflado (PIM):</strong> Es el Presupuesto Institucional Modificado. Es la plata real que tiene la obra hoy, después de adendas, recortes o inyecciones de dinero.<br>
+    • <strong>Sobrecosto (Color Rojo):</strong> Se calcula restando <code>PIM - PIA</code>. Mide cuánto se ha inflado el presupuesto original. <strong style="color: #ef4444;">El color rojo se intensifica</strong> matemáticamente mientras más alto sea el sobrecosto. Si el número es negativo, significa que a la obra se le quitó presupuesto (recorte).<br>
+    • <strong>% Gasto Real (Termómetro Verde):</strong> Se calcula dividiendo <code>(Gasto Devengado ÷ PIM) × 100</code>. <strong style="color: #10b981;">Color Verde Oscuro</strong> significa que se ejecutó casi el 100% del dinero asignado para este año. Amarillo significa avance a medias, y Rojo/Blanco significa 0% de ejecución (estancamiento).<br><br>
+    <strong>🔍 Fuentes Oficiales:</strong><br>
+    Los datos de esta tabla son extraídos del <strong><a href="https://datosabiertos.mef.gob.pe/dataset/presupuesto-y-ejecucion-de-gasto" target="_blank">Gasto Diario (SIAF) del MEF</a></strong>. Las columnas procesadas corresponden exactamente a <code>MONTO_PIA</code>, <code>MONTO_PIM</code> y <code>MONTO_DEVENGADO</code>.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    list_query = f"""
+        SELECT 
+            PRODUCTO_PROYECTO as "CUI",
+            MAX(PRODUCTO_PROYECTO_NOMBRE) as "Nombre del Proyecto de Inversión",
+            CASE WHEN SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) > 0 THEN ROUND((SUM(TRY_CAST(MONTO_DEVENGADO AS DOUBLE)) / SUM(TRY_CAST(MONTO_PIM AS DOUBLE))) * 100, 1) ELSE 0 END as "% Gasto Real",
+            SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as "Costo Inicial Planeado (PIA)",
+            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) as "Costo Inflado (PIM)",
+            SUM(TRY_CAST(MONTO_PIM AS DOUBLE)) - SUM(TRY_CAST(MONTO_PIA AS DOUBLE)) as "Sobrecosto"
+        FROM '{PARQUET_FILE}'
+        WHERE {where_clause} AND CATEGORIA_GASTO = 6
+        AND PRODUCTO_PROYECTO NOT IN ('3999999', '2999999', '3000001', '2001621')
+        GROUP BY PRODUCTO_PROYECTO
+        ORDER BY "Costo Inflado (PIM)" DESC
+    """
+    df_list = conn.execute(list_query).df()
+    
+    if not df_list.empty:
+        import pandas as pd
+        pd.set_option("styler.render.max_elements", 2000000)
+        
+        # Para evitar que el navegador del usuario colapse al renderizar 45,000 colores,
+        # limitamos la previsualización a los 1500 proyectos más costosos si estamos en vista Macro.
+        df_display = df_list.copy()
+        if len(df_display) > 1000:
+            st.warning(f"⚠️ La base de datos tiene {len(df_list)} proyectos. Para mantener la plataforma rápida, se están previsualizando solo los primeros 1000 registros. ¡Utiliza el botón de descarga abajo para obtener el Excel con TODOS los datos completos!")
+            df_display = df_display.head(1000)
+            
+        styler = df_display.style.format({
+            "% Gasto Real": "{:.1f}%",
+            "Costo Inicial Planeado (PIA)": "S/ {:,.0f}",
+            "Costo Inflado (PIM)": "S/ {:,.0f}",
+            "Sobrecosto": "S/ {:,.0f}"
+        }).background_gradient(subset=["% Gasto Real"], cmap="RdYlGn", vmin=0, vmax=100) \
+          .background_gradient(subset=["Sobrecosto"], cmap="Reds")
+          
+        st.dataframe(styler, use_container_width=True, hide_index=True)
+        
+        # Botón para descargar el dataset completo
+        csv_full = df_list.to_csv(index=False).encode('utf-8-sig')
+        st.download_button("📥 Descargar Base de Datos SNIP Completa (Excel)", data=csv_full, file_name="todas_las_obras_snip.csv", mime="text/csv")
+
+# ------------------------------------------
+# TAB 4: DETALLE POR OBRA (RADIOGRAFÍA FINANCIERA)
+# ------------------------------------------
+with tab4:
     st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
     st.markdown('<h2 style="color:#0f172a; font-weight:900;">🏛️ Auditoría Histórica de Obras por Gestión</h2>', unsafe_allow_html=True)
     st.markdown('<p style="color:#475569;">Esta pestaña evalúa el desempeño de los alcaldes (históricos vs. actual) basándose en la creación, liquidación y abandono de obras.</p>', unsafe_allow_html=True)
