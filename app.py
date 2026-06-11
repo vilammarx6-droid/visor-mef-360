@@ -430,7 +430,7 @@ with tab1:
             df_rubro['Rubro'] = df_rubro['Rubro'].apply(lambda x: (str(x)[:35] + '..') if len(str(x)) > 35 else str(x))
             fig_rubro = px.bar(df_rubro, x='PIM', y='Rubro', orientation='h', color='% Avance', color_continuous_scale='RdYlGn', range_color=[0, 100], text='PIM')
             fig_rubro.update_traces(texttemplate='S/ %{text:,.0s}', textposition='outside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<br>Avance: %{marker.color:.1f}%<extra></extra>', width=0.4)
-            fig_rubro.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_colorbar=dict(title="% Avance"))
+            fig_rubro.update_layout(dragmode=False, margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_colorbar=dict(title="% Avance"))
             st.plotly_chart(fig_rubro, use_container_width=True, config={'displayModeBar': False})
 
     with col_dest:
@@ -452,7 +452,7 @@ with tab1:
             df_funcion['Funcion'] = df_funcion['Funcion'].apply(lambda x: (str(x)[:35] + '..') if len(str(x)) > 35 else str(x))
             fig_funcion = px.bar(df_funcion, x='PIM', y='Funcion', orientation='h', color='% Avance', color_continuous_scale='RdYlGn', range_color=[0, 100], text='PIM')
             fig_funcion.update_traces(texttemplate='S/ %{text:,.0s}', textposition='outside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<br>Avance: %{marker.color:.1f}%<extra></extra>', width=0.4)
-            fig_funcion.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_colorbar=dict(title="% Avance"))
+            fig_funcion.update_layout(dragmode=False, margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_colorbar=dict(title="% Avance"))
             st.plotly_chart(fig_funcion, use_container_width=True, config={'displayModeBar': False})
             
     st.markdown('<br>', unsafe_allow_html=True)
@@ -472,7 +472,7 @@ with tab1:
             line_shape='spline',
             hovertemplate='S/ %{y:,.1f} M<extra></extra>'
         )
-        fig_line.update_layout(
+        fig_line.update_layout(dragmode=False, 
             hovermode='x unified',
             plot_bgcolor='rgba(0,0,0,0)',
             paper_bgcolor='rgba(0,0,0,0)',
@@ -503,7 +503,7 @@ with tab1:
     if not df_pie.empty:
         fig_pie = px.pie(df_pie, values='Presupuesto', names='Tipo_Gasto', hole=0.5, 
                          color_discrete_sequence=['#3b82f6', '#ef4444', '#f59e0b', '#94a3b8'])
-        fig_pie.update_layout(margin=dict(t=10, b=10, l=10, r=10), height=280, legend=dict(orientation="v", yanchor="auto", y=0.5, xanchor="right", x=1))
+        fig_pie.update_layout(dragmode=False, margin=dict(t=10, b=10, l=10, r=10), height=280, legend=dict(orientation="v", yanchor="auto", y=0.5, xanchor="right", x=1))
         fig_pie.update_traces(hovertemplate='<b>%{label}</b><br>Presupuesto: S/ %{value:,.0f}<extra></extra>')
         st.plotly_chart(fig_pie, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div><br>', unsafe_allow_html=True)
@@ -526,7 +526,7 @@ with tab1:
         
         fig_gen = px.bar(df_gen, x='PIM', y='Categoria', orientation='h', text='PIM', color='PIM', color_continuous_scale='Teal')
         fig_gen.update_traces(texttemplate='S/ %{text:,.0s}', textposition='outside', hovertemplate='<b>%{y}</b><br>Presupuesto: S/ %{x:,.0f}<extra></extra>', width=0.4)
-        fig_gen.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_showscale=False)
+        fig_gen.update_layout(dragmode=False, margin=dict(l=10, r=40, t=10, b=10), height=250, coloraxis_showscale=False)
         st.plotly_chart(fig_gen, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div><br>', unsafe_allow_html=True)
     
@@ -576,7 +576,7 @@ with tab1:
                              text='Cantidad de Obras')
                              
             fig_reg.update_traces(texttemplate='%{text:,.0f}', textposition='outside', hovertemplate='<b>%{y}</b><br>%{x:,.0f} Obras<extra></extra>', width=0.35)
-            fig_reg.update_layout(margin=dict(l=10, r=40, t=10, b=10), height=400, yaxis_title="", yaxis={'categoryorder':'total ascending'}, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=""))
+            fig_reg.update_layout(dragmode=False, margin=dict(l=10, r=40, t=10, b=10), height=400, yaxis_title="", yaxis={'categoryorder':'total ascending'}, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, title=""))
             st.plotly_chart(fig_reg, use_container_width=True, config={'displayModeBar': False})
     except Exception as e:
         pass
@@ -1344,7 +1344,7 @@ with tab2:
                                 fig.add_trace(go.Scatter(x=df_chart['Año'], y=df_chart['Ejecucion_Total'], mode='lines+markers', fill='tozeroy', name='Ejecución Acumulada', line=dict(color='#0ea5e9', width=2), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
                                 fig.add_trace(go.Scatter(x=df_chart['Año'], y=df_chart['Costo_Actual'], mode='lines+markers', name='Costo del Proyecto', line=dict(color='#ef4444', width=3), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
                                 
-                                fig.update_layout(
+                                fig.update_layout(dragmode=False, 
                                     yaxis_title="Soles (S/)",
                                     xaxis_title="",
                                     hovermode="x unified",
@@ -1401,7 +1401,7 @@ with tab2:
                             fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Programado'], mode='lines', fill='tozeroy', name='Programado', line=dict(color='#cbd5e1', width=2, dash='dash'), hovertemplate='%{y:.1f}%<extra></extra>'))
                             fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Real'], mode='lines+markers', name='Real', line=dict(color='#3b82f6', width=3), hovertemplate='%{y:.1f}%<extra></extra>'))
                             
-                            fig_fis.update_layout(
+                            fig_fis.update_layout(dragmode=False, 
                                 yaxis_title="Porcentaje (%)",
                                 xaxis_title="Mes de Avance",
                                 hovermode="x unified",
