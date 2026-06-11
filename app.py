@@ -1311,8 +1311,8 @@ with tab2:
                                 import plotly.graph_objects as go
                                 
                                 fig = go.Figure()
-                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Ejecucion_Total'], mode='lines', fill='tozeroy', name='Ejecución', line=dict(color='#0ea5e9', width=2, shape='spline'), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
-                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Costo_Actual'], mode='lines+markers', name='Costo', line=dict(color='#ef4444', width=3, shape='spline'), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
+                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Ejecucion_Total'], mode='lines', fill='tozeroy', name='Ejecución', line=dict(color='#0ea5e9', width=2), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
+                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Costo_Actual'], mode='lines+markers', name='Costo', line=dict(color='#ef4444', width=3), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
                                 
                                 fig.update_layout(
                                     yaxis_title="Soles (S/)",
@@ -1369,8 +1369,8 @@ with tab2:
                         if not df_curva_fis.empty:
                             df_curva_fis['Fecha'] = df_curva_fis['Ano'].astype(str) + '-' + df_curva_fis['Mes'].astype(str).str.zfill(2)
                             fig_fis = go.Figure()
-                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Programado'], mode='lines', fill='tozeroy', name='Programado', line=dict(color='#cbd5e1', width=2, dash='dash', shape='spline'), hovertemplate='%{y:.1f}%<extra></extra>'))
-                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Real'], mode='lines+markers', name='Real', line=dict(color='#3b82f6', width=3, shape='spline'), hovertemplate='%{y:.1f}%<extra></extra>'))
+                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Programado'], mode='lines', fill='tozeroy', name='Programado', line=dict(color='#cbd5e1', width=2, dash='dash'), hovertemplate='%{y:.1f}%<extra></extra>'))
+                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Real'], mode='lines+markers', name='Real', line=dict(color='#3b82f6', width=3), hovertemplate='%{y:.1f}%<extra></extra>'))
                             
                             fig_fis.update_layout(
                                 yaxis_title="Porcentaje (%)",
