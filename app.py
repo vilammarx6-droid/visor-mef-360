@@ -1312,10 +1312,9 @@ with tab2:
                                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                                 )
                                 fig.update_xaxes(dtick=1)
-                                st.markdown('<div class="card-white">', unsafe_allow_html=True)
-                                st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Variación del Costo vs Ejecución</div>', unsafe_allow_html=True)
-                                st.plotly_chart(fig, use_container_width=True)
-                                st.markdown('</div>', unsafe_allow_html=True)
+                                with st.container(border=True):
+                                    st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Variación del Costo vs Ejecución</div>', unsafe_allow_html=True)
+                                    st.plotly_chart(fig, use_container_width=True)
                                 
                                 all_years = set(str(y) for y in range(int(año_ini), int(año_fin) + 1))
                                 found_years = set(df_ssi_hist['Año'].astype(str))
@@ -1366,10 +1365,9 @@ with tab2:
                                 margin=dict(l=20, r=20, t=10, b=20),
                                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                             )
-                            st.markdown('<div class="card-white">', unsafe_allow_html=True)
-                            st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Avance Físico (Programado vs Real)</div>', unsafe_allow_html=True)
-                            st.plotly_chart(fig_fis, use_container_width=True)
-                            st.markdown('</div>', unsafe_allow_html=True)
+                            with st.container(border=True):
+                                st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Avance Físico (Programado vs Real)</div>', unsafe_allow_html=True)
+                                st.plotly_chart(fig_fis, use_container_width=True)
                         else:
                             st.info("No hay historial mensual de avance físico para esta obra en INFOBRAS.")
                     except Exception as e:
