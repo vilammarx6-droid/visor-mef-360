@@ -962,21 +962,22 @@ with tab2:
             
             # 7. Tabla Resumen de Sobrecostos e Irregularidades
             st.markdown('<h4 style="font-weight:900; color:#0f172a; margin-top:20px;">Súper Tabla de Gastos vs Avance Físico</h4>', unsafe_allow_html=True)
-            
             df_table = df_filtered.sort_values(by="Desbalance", ascending=False)
             
-            if len(df_table) > 1000:
-                st.warning(f"⚠️ La lista contiene {len(df_table)} obras. Para no sobrecargar tu navegador, previsualizando el Top 1000 más crítico. ¡Si descargas el Excel se bajará completo!")
-                df_table = df_table.head(1000)
-                
+            # Formateamos el nombre en df_table COMPLETO (para el CSV)
             df_table['Nombre'] = df_table.apply(lambda r: "🛑 " + str(r['Nombre']) if r['Paralizada'] == 1 else str(r['Nombre']), axis=1)
             
+            df_ui = df_table.copy()
+            if len(df_ui) > 1000:
+                st.warning(f"⚠️ La lista contiene {len(df_table)} obras. Para no sobrecargar tu navegador, previsualizando el Top 1000 más crítico. ¡Si descargas el Excel se bajará completo!")
+                df_ui = df_ui.head(1000)
+                
             def style_desbalance(val):
                 if isinstance(val, (int, float)) and val > 30: return 'background-color: #fee2e2; color: #b91c1c; font-weight: bold;'
                 return ''
                 
             st.dataframe(
-                df_table[['CUI', 'Nombre', 'Gestión de Origen', 'Estado del Plazo', 'Estado (INFOBRAS)', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
+                df_ui[['CUI', 'Nombre', 'Gestión de Origen', 'Estado del Plazo', 'Estado (INFOBRAS)', 'Costo Total (MEF)', 'Devengado Histórico (MEF)', f'Gasto ({CURRENT_YEAR})', 'Avance Financiero % (MEF)', 'Avance Físico % (INFOBRAS)', 'Desbalance', 'Fecha Inicio (INFOBRAS)', 'Fecha Fin Prog. (INFOBRAS)']].style.map(style_desbalance, subset=['Desbalance']).format({
                     "Costo Total (MEF)": "S/ {:,.0f}", "Devengado Histórico (MEF)": "S/ {:,.0f}", f"Gasto ({CURRENT_YEAR})": "S/ {:,.0f}", "Desbalance": "{:.1f}%", "Avance Financiero % (MEF)": "{:.1f}%", "Avance Físico % (INFOBRAS)": "{:.1f}%"
                 }), use_container_width=True, hide_index=True, height=500
             )
@@ -1044,9 +1045,9 @@ with tab3:
         # Para evitar que el navegador del usuario colapse al renderizar 45,000 colores,
         # limitamos la previsualización a los 1500 proyectos más costosos si estamos en vista Macro.
         df_display = df_list.copy()
-        if len(df_display) > 1500:
-            st.warning(f"⚠️ La base de datos tiene {len(df_list)} proyectos. Para mantener la plataforma rápida, se están visualizando los 1500 proyectos con mayor PIM. Utiliza los filtros para ver otras municipalidades específicas.")
-            df_display = df_display.head(1500)
+        if len(df_display) > 1000:
+            st.warning(f"⚠️ La base de datos tiene {len(df_list)} proyectos. Para mantener la plataforma rápida, se están previsualizando solo los primeros 1000 registros. ¡Utiliza el botón de descarga abajo para obtener el Excel con TODOS los datos completos!")
+            df_display = df_display.head(1000)
             
         styler = df_display.style.format({
             "% Gasto Real": "{:.1f}%",
@@ -1580,7 +1581,23 @@ with tab5:
         cols_mostrar = [c for c in cols_mostrar if c in df_mostrar.columns]
         
         st.markdown(f"**Resultados:** {len(df_mostrar)} proyectos encontrados.")
-        st.dataframe(df_mostrar[cols_mostrar], use_container_width=True)
+        
+        # Límite de seguridad para evitar colapsar la memoria del navegador
+        df_ui = df_mostrar[cols_mostrar].copy()
+        if len(df_ui) > 1000:
+            st.warning(f"⚠️ La tabla contiene {len(df_mostrar)} registros. Para no saturar tu navegador, se previsualizan solo 1000 obras. ¡Usa el botón de descarga abajo para obtener el Excel con el 100% de los datos!")
+            df_ui = df_ui.head(1000)
+            
+        st.dataframe(df_ui, use_container_width=True)
+        
+        # Botón de Descarga
+        csv_audit = df_mostrar[cols_mostrar].to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 Descargar Auditoría Completa (Excel)",
+            data=csv_audit,
+            file_name="auditoria_gestiones.csv",
+            mime="text/csv"
+        )
         
     else:
         st.info("No hay datos disponibles o debe realizar una búsqueda en la izquierda para cargar las obras.")
