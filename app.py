@@ -1311,13 +1311,17 @@ with tab2:
                                 import plotly.graph_objects as go
                                 
                                 fig = go.Figure()
-                                fig.add_trace(go.Bar(x=df_ssi_hist['Año'], y=df_ssi_hist['Ejecucion_Total'], name='Ejecución', marker_color='#94a3b8', hovertemplate='S/ %{y:,.0f}<extra></extra>'))
-                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Costo_Actual'], mode='lines+markers', name='Costo', line=dict(color='#ef4444', width=3), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
+                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Ejecucion_Total'], mode='lines', fill='tozeroy', name='Ejecución', line=dict(color='#0ea5e9', width=2, shape='spline'), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
+                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Costo_Actual'], mode='lines+markers', name='Costo', line=dict(color='#ef4444', width=3, shape='spline'), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
                                 
                                 fig.update_layout(
                                     yaxis_title="Soles (S/)",
                                     xaxis_title="Año Fiscal",
                                     hovermode="x unified",
+                                    plot_bgcolor='rgba(0,0,0,0)',
+                                    paper_bgcolor='rgba(0,0,0,0)',
+                                    xaxis=dict(showgrid=False, zeroline=False, showspikes=True, spikemode='across', spikethickness=1, spikedash='solid', spikecolor='#94a3b8'),
+                                    yaxis=dict(showgrid=True, gridcolor='#f1f5f9', zeroline=False),
                                     margin=dict(l=20, r=20, t=10, b=20),
                                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                                 )
@@ -1365,14 +1369,17 @@ with tab2:
                         if not df_curva_fis.empty:
                             df_curva_fis['Fecha'] = df_curva_fis['Ano'].astype(str) + '-' + df_curva_fis['Mes'].astype(str).str.zfill(2)
                             fig_fis = go.Figure()
-                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Programado'], mode='lines', name='Programado', line=dict(color='#94a3b8', width=2, dash='dash'), hovertemplate='%{y:.1f}%<extra></extra>'))
-                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Real'], mode='lines+markers', name='Real', line=dict(color='#3b82f6', width=3), hovertemplate='%{y:.1f}%<extra></extra>'))
+                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Programado'], mode='lines', fill='tozeroy', name='Programado', line=dict(color='#cbd5e1', width=2, dash='dash', shape='spline'), hovertemplate='%{y:.1f}%<extra></extra>'))
+                            fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Real'], mode='lines+markers', name='Real', line=dict(color='#3b82f6', width=3, shape='spline'), hovertemplate='%{y:.1f}%<extra></extra>'))
                             
                             fig_fis.update_layout(
                                 yaxis_title="Porcentaje (%)",
                                 xaxis_title="Mes de Avance",
                                 hovermode="x unified",
-                                yaxis=dict(range=[0, 105]),
+                                plot_bgcolor='rgba(0,0,0,0)',
+                                paper_bgcolor='rgba(0,0,0,0)',
+                                xaxis=dict(showgrid=False, zeroline=False, showspikes=True, spikemode='across', spikethickness=1, spikedash='solid', spikecolor='#94a3b8'),
+                                yaxis=dict(showgrid=True, gridcolor='#f1f5f9', zeroline=False, range=[0, 105]),
                                 margin=dict(l=20, r=20, t=10, b=20),
                                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                             )
