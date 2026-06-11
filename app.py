@@ -1590,14 +1590,13 @@ with tab5:
             df_ui = df_ui.head(1000)
             
         st.dataframe(
-            df_ui, 
-            use_container_width=True,
-            column_config={
-                "Avance Físico % (INFOBRAS)": st.column_config.NumberColumn(format="%.1f%%"),
-                "Avance Financiero % (MEF)": st.column_config.NumberColumn(format="%.1f%%"),
-                "COSTO_ACTUAL": st.column_config.NumberColumn(format="S/ %d"),
-                "MONTO_EJECUCION_TOTAL": st.column_config.NumberColumn(format="S/ %d"),
-            }
+            df_ui.style.format({
+                "Avance Físico % (INFOBRAS)": "{:.1f}%",
+                "Avance Financiero % (MEF)": "{:.1f}%",
+                "COSTO_ACTUAL": "S/ {:,.0f}",
+                "MONTO_EJECUCION_TOTAL": "S/ {:,.0f}"
+            }), 
+            use_container_width=True
         )
         
         # Botón de Descarga
