@@ -1030,10 +1030,6 @@ with tab2:
         st.warning("El motor está procesando la base de datos de INFOBRAS en segundo plano. Regresa en unos segundos.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ---------------------------------------------------------
-# TAB 3: LISTADO SNIP COMPLETO
-# ---------------------------------------------------------
-
     st.markdown('<hr style="border:2px solid #cbd5e1; margin-top:50px; margin-bottom:50px;">', unsafe_allow_html=True)
     st.markdown("### 🔎 Radiografía Financiera de la Obra")
     st.markdown("Desglose a nivel de centavos de los rubros en los que gasta una obra específica.")
@@ -1455,6 +1451,9 @@ with tab2:
 # TAB 5: AUDITORÍA HISTÓRICA DE GESTIONES
 # ---------------------------------------------------------
 
+# ---------------------------------------------------------
+# TAB 3: LISTADO SNIP COMPLETO
+# ---------------------------------------------------------
 with tab3:
     st.markdown('<div style="padding:20px;">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Base de Datos Completa de Proyectos (SNIP)</div>', unsafe_allow_html=True)
