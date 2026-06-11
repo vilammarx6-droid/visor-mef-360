@@ -110,7 +110,8 @@ def get_latest_parquet_and_download():
         main_parquet,
         "infobras_avance.parquet",
         "infobras_paralizadas.parquet",
-        "seguimiento_inversiones.parquet"
+        "seguimiento_inversiones.parquet",
+        "historial_curvas.parquet"
     ]
     import time
     for file in files_to_download:
@@ -771,7 +772,7 @@ with tab2:
                     lista_gestiones.append(f"{g} ({gestiones_counts.get(g, 0)})")
                 lista_gestiones.append(f"Sin Fecha Reportada ({gestiones_counts.get('Sin Fecha Reportada', 0)})")
                 filtro_gestion_raw = st.selectbox("🏛️ **Gestión (Origen):**", lista_gestiones)
-                filtro_gestion = filtro_gestion_raw.split(" (")[0]
+                filtro_gestion = filtro_gestion_raw.rsplit(" (", 1)[0]
             with fc3:
                 plazo_counts = df_vs['Estado del Plazo'].value_counts()
                 lista_plazos = [
@@ -781,13 +782,13 @@ with tab2:
                     f"Sin Cronograma ({plazo_counts.get('Sin Cronograma', 0)})"
                 ]
                 filtro_plazo_raw = st.selectbox("⏳ **Vigencia del Plazo:**", lista_plazos)
-                filtro_plazo = filtro_plazo_raw.split(" (")[0]
+                filtro_plazo = filtro_plazo_raw.rsplit(" (", 1)[0]
             with fc4:
                 liq_count = len(df_vs[df_vs['Liquidada'] == 'Si'])
                 noliq_count = len(df_vs[df_vs['Liquidada'] != 'Si'])
                 lista_liq = [f"Todas las Obras ({len(df_vs)})", f"Liquidadas (Cerradas) ({liq_count})", f"No Liquidadas (Abiertas) ({noliq_count})"]
                 filtro_liq_raw = st.selectbox("📄 **Liquidación:**", lista_liq)
-                filtro_liq = filtro_liq_raw.split(" (")[0]
+                filtro_liq = filtro_liq_raw.rsplit(" (", 1)[0]
                 
             # 3. Aplicar Filtros al DataFrame principal (df_filtered)
             df_filtered = df_vs.copy()
@@ -1266,29 +1267,8 @@ with tab2:
                 
                 with st.spinner("Rastreando el costo histórico en los archivos SSI (Puede tardar unos segundos)..."):
                     try:
-                        all_ssi_paths = set([f.get('path', '') for f in hf_files if isinstance(f, dict)])
-                        for local_f in os.listdir('.'):
-                            if local_f.endswith('-Seguimiento-PI.parquet'):
-                                all_ssi_paths.add(local_f)
-                                
-                        ssi_query_parts = []
-                        for path in all_ssi_paths:
-                            if path.endswith("-Seguimiento-PI.parquet"):
-                                year = path.split("-")[0]
-                                if os.path.exists(path):
-                                    source = f"'{path}'"
-                                else:
-                                    source = f"read_parquet('https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{path}')"
-                                    
-                                if int(year) < 2024:
-                                    q = f"SELECT '{year}' as Año, NULL as Costo_Actual, SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as Ejecucion_Total FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' GROUP BY PRODUCTO_PROYECTO"
-                                else:
-                                    q = f"SELECT '{year}' as Año, MAX(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as Costo_Actual, SUM(TRY_CAST(MONTO_EJECUCION_TOTAL AS DOUBLE)) as Ejecucion_Total FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' GROUP BY PRODUCTO_PROYECTO"
-                                ssi_query_parts.append(q)
-                        
-                        if ssi_query_parts:
-                            ssi_hist_query = " UNION ALL ".join(ssi_query_parts) + " ORDER BY Año ASC"
-                            df_ssi_hist = conn.execute(ssi_hist_query).df()
+                        if os.path.exists("historial_curvas.parquet"):
+                            df_ssi_hist = conn.execute(f"SELECT Año, Costo_Actual, Ejecucion_Total FROM 'historial_curvas.parquet' WHERE PRODUCTO_PROYECTO = '{cui_code}' ORDER BY Año ASC").df()
                         else:
                             df_ssi_hist = pd.DataFrame()
                         
@@ -1314,18 +1294,9 @@ with tab2:
                                 
                                 # Extraer Costo Viable (Mínimo histórico sobreviviente)
                                 try:
-                                    # We need to query the raw Seguimiento-PI files, not the Gasto-Diario file
-                                    viable_parts = []
-                                    for path in all_ssi_paths:
-                                        if path.endswith("-Seguimiento-PI.parquet") and int(path.split("-")[0]) >= 2024:
-                                            source = f"'{path}'" if os.path.exists(path) else f"read_parquet('https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{path}')"
-                                            viable_parts.append(f"SELECT MIN(TRY_CAST(COSTO_ACTUAL AS DOUBLE)) as Costo_Viable FROM {source} WHERE PRODUCTO_PROYECTO = '{cui_code}' AND TRY_CAST(COSTO_ACTUAL AS DOUBLE) > 1000")
-                                    
-                                    if viable_parts:
-                                        q_viable = " UNION ALL ".join(viable_parts)
-                                        df_viable = conn.execute(q_viable).df()
+                                    if os.path.exists("historial_curvas.parquet"):
+                                        df_viable = conn.execute(f"SELECT MIN(Costo_Actual) as Costo_Viable FROM 'historial_curvas.parquet' WHERE PRODUCTO_PROYECTO = '{cui_code}' AND Costo_Actual > 1000").df()
                                         valid_viable = df_viable.dropna(subset=['Costo_Viable'])
-                                        valid_viable = valid_viable[valid_viable['Costo_Viable'] > 1000]
                                         costo_viable = valid_viable['Costo_Viable'].min() if not valid_viable.empty else costo_ini
                                     else:
                                         costo_viable = costo_ini
