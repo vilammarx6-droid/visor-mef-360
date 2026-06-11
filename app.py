@@ -616,7 +616,9 @@ with tab2:
                        MAX(Fecha_finalizaci_n_programada_de_obra) as Fecha_finalizaci_n_programada_de_obra,
                        MAX(TRY_CAST(_Tiene_liquidaci_n_de_obra_ AS VARCHAR)) as Tiene_Liquidacion,
                        MAX(Fecha_de_aprobaci_n_de_liquidaci_n_de_obra) as Fecha_Liquidacion,
-                       MAX(TRY_CAST(Estado_de_ejecuci_n AS VARCHAR)) as Estado_INFOBRAS
+                       MAX(TRY_CAST(Estado_de_ejecuci_n AS VARCHAR)) as Estado_INFOBRAS,
+                       MAX(Nombres_Apellidos) as Residente,
+                       MAX(Nombres_Apellidos_1) as Supervisor
                 FROM 'infobras_avance.parquet' 
                 {infobras_filter}
                 GROUP BY 1
@@ -645,10 +647,12 @@ with tab2:
                 ROUND(COALESCE((s.MONTO_EJECUCION_TOTAL / NULLIF(s.COSTO_ACTUAL, 0)) * 100, 0), 1) as "Avance Financiero % (MEF)",
                 ROUND(TRY_CAST(i.AVANCE_FISICO_INFOBRAS AS DOUBLE), 1) as "Avance Físico % (INFOBRAS)",
                 i.Fecha_de_inicio_de_obra as "Fecha Inicio (INFOBRAS)",
-                s.Anio_Inicio_MEF,
+                s.Anio_Inicio_MEF as "Año Inicio (MEF)",
                 i.Fecha_finalizaci_n_programada_de_obra as "Fecha Fin Prog. (INFOBRAS)",
                 COALESCE(i.Tiene_Liquidacion, 'No') as "Liquidada",
                 i.Fecha_Liquidacion as "Fecha Liquidación",
+                COALESCE(NULLIF(i.Residente, ''), 'Sin Registro en INFOBRAS') as "Residente",
+                COALESCE(NULLIF(i.Supervisor, ''), 'Sin Registro en INFOBRAS') as "Supervisor",
                 COALESCE(p.ES_PARALIZADA, 0) as "Paralizada"
             FROM ssi s
             {join_type} infobras i ON s.CUI = i.CUI_INFOBRAS
@@ -665,11 +669,15 @@ with tab2:
             df_vs['Estado'] = np.where(df_vs['Paralizada']==1, "⚠️ PARALIZADA", 
                                 np.where(df_vs['Desbalance']>30, "⚠️ DESFASE (Financiero > Físico)", "✅ Normal"))
             
+            # Limpieza de valores nulos
+            df_vs['Fecha Inicio (INFOBRAS)'] = df_vs['Fecha Inicio (INFOBRAS)'].fillna('Sin Registro')
+            df_vs['Fecha Liquidación'] = df_vs['Fecha Liquidación'].fillna('Sin Registro')
+            
             # Vectorized Gestión de Origen
             fecha_str = df_vs['Fecha Inicio (INFOBRAS)'].astype(str).str.strip()
             year_infobras = pd.to_numeric(fecha_str.str.extract(r'(\d{4})$', expand=False), errors='coerce')
             year_infobras = year_infobras.where((year_infobras >= 2000) & (year_infobras <= 2030), np.nan)
-            year_mef = pd.to_numeric(df_vs['Anio_Inicio_MEF'], errors='coerce')
+            year_mef = pd.to_numeric(df_vs['Año Inicio (MEF)'], errors='coerce')
             final_year = year_infobras.fillna(year_mef).fillna(0).astype(int)
             
             bins = [-1, 0, 2010, 2014, 2018, 2022, 2026, 9999]
@@ -1530,8 +1538,24 @@ with tab5:
         liquidadas_actual = len(df_audit[df_audit['Liquidada_Por_Actual']])
         abandonadas = len(df_audit[df_audit['Heredada_Abandonada']])
         
+        # 3. Vista Detallada Interactiva (Filtro arriba)
+        st.markdown('<div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px; margin-bottom: 20px;">', unsafe_allow_html=True)
+        st.markdown('**🔍 Explorar Detalles:** Seleccione un grupo para ver la lista exacta de obras con sus montos, fechas y personal a cargo.', unsafe_allow_html=True)
+        
+        opciones = {
+            f"Mostrar TODAS ({total_historico})": df_audit,
+            f"Nuevas Obras (Gestión 23-26) ({obras_actual})": df_audit[df_audit['Es_Gestion_Actual']],
+            f"Liquidadas por Gestión Actual ({liquidadas_actual})": df_audit[df_audit['Liquidada_Por_Actual']],
+            f"Heredadas Abandonadas ({abandonadas})": df_audit[df_audit['Heredada_Abandonada']],
+            f"Todas las Liquidadas Históricas ({total_liquidadas})": df_audit[df_audit['Liquidada'] == 'Si']
+        }
+        
+        vista_seleccionada = st.radio("Filtrar tabla de auditoría:", list(opciones.keys()), horizontal=True)
+        df_mostrar = opciones[vista_seleccionada]
+        st.markdown('</div>', unsafe_allow_html=True)
+        
         # Render Metrics
-        st.markdown('<h4 style="color:#0f172a; margin-top:20px;">📊 Resumen General (Todo el Historial)</h4>', unsafe_allow_html=True)
+        st.markdown('<h4 style="color:#0f172a; margin-top:0px;">📊 Resumen General (Todo el Historial)</h4>', unsafe_allow_html=True)
         col1, col2, col3, col4, col5 = st.columns(5)
         
         def render_audit_metric(title, value, color="#3b82f6", bg="#eff6ff"):
@@ -1550,32 +1574,9 @@ with tab5:
         
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # 3. Vista Detallada Interactiva
-        st.markdown('<div style="background-color: #f1f5f9; padding: 15px; border-radius: 8px;">', unsafe_allow_html=True)
-        st.markdown('**🔍 Explorar Detalles:** Seleccione un grupo para ver la lista exacta de obras con sus montos y fechas.', unsafe_allow_html=True)
-        
-        vista_seleccionada = st.radio(
-            "Filtrar tabla de auditoría:",
-            ["Mostrar TODAS", "Nuevas Obras (Gestión 23-26)", "Liquidadas por Gestión Actual", "Heredadas Abandonadas", "Todas las Liquidadas Históricas"],
-            horizontal=True
-        )
-        
-        if vista_seleccionada == "Nuevas Obras (Gestión 23-26)":
-            df_mostrar = df_audit[df_audit['Es_Gestion_Actual']]
-        elif vista_seleccionada == "Liquidadas por Gestión Actual":
-            df_mostrar = df_audit[df_audit['Liquidada_Por_Actual']]
-        elif vista_seleccionada == "Heredadas Abandonadas":
-            df_mostrar = df_audit[df_audit['Heredada_Abandonada']]
-        elif vista_seleccionada == "Todas las Liquidadas Históricas":
-            df_mostrar = df_audit[df_audit['Liquidada'] == 'Si']
-        else:
-            df_mostrar = df_audit
-            
-        st.markdown('</div>', unsafe_allow_html=True)
-        
         # Limpiar columnas para mostrar
-        cols_mostrar = ['CUI', 'Nombre', 'Gestión de Origen', 'Fecha Inicio (INFOBRAS)', 'Fecha Liquidación', 
-                        'Avance Físico % (INFOBRAS)', 'Avance Financiero % (MEF)', 'Estado (INFOBRAS)', 'COSTO_ACTUAL', 'MONTO_EJECUCION_TOTAL']
+        cols_mostrar = ['CUI', 'Nombre', 'Gestión de Origen', 'Año Inicio (MEF)', 'Fecha Inicio (INFOBRAS)', 'Fecha Liquidación', 
+                        'Avance Físico % (INFOBRAS)', 'Avance Financiero % (MEF)', 'Estado (INFOBRAS)', 'COSTO_ACTUAL', 'MONTO_EJECUCION_TOTAL', 'Residente', 'Supervisor']
         
         # Filtrar solo columnas que existan
         cols_mostrar = [c for c in cols_mostrar if c in df_mostrar.columns]
@@ -1588,7 +1589,16 @@ with tab5:
             st.warning(f"⚠️ La tabla contiene {len(df_mostrar)} registros. Para no saturar tu navegador, se previsualizan solo 1000 obras. ¡Usa el botón de descarga abajo para obtener el Excel con el 100% de los datos!")
             df_ui = df_ui.head(1000)
             
-        st.dataframe(df_ui, use_container_width=True)
+        st.dataframe(
+            df_ui, 
+            use_container_width=True,
+            column_config={
+                "Avance Físico % (INFOBRAS)": st.column_config.NumberColumn(format="%.1f%%"),
+                "Avance Financiero % (MEF)": st.column_config.NumberColumn(format="%.1f%%"),
+                "COSTO_ACTUAL": st.column_config.NumberColumn(format="S/ %d"),
+                "MONTO_EJECUCION_TOTAL": st.column_config.NumberColumn(format="S/ %d"),
+            }
+        )
         
         # Botón de Descarga
         csv_audit = df_mostrar[cols_mostrar].to_csv(index=False).encode('utf-8-sig')
