@@ -1291,22 +1291,11 @@ with tab2:
                                     
                                 var_color = "#ef4444" if variacion > 10 else "#22c55e" if variacion < 0 else "#64748b"
                                 
-                                st.markdown(f'''
-                                <div style="display:flex; justify-content:space-around; background-color:#ffffff; padding:15px; border-radius:8px; border:1px solid #e2e8f0; margin-bottom:15px;">
-                                    <div style="text-align:center;">
-                                        <div style="font-size:12px; color:#64748b;">Costo Inicial ({año_ini})</div>
-                                        <div style="font-size:18px; font-weight:bold;">S/ {f_soles(costo_ini)}</div>
-                                    </div>
-                                    <div style="text-align:center;">
-                                        <div style="font-size:12px; color:#64748b;">Costo Actual ({año_fin})</div>
-                                        <div style="font-size:18px; font-weight:bold;">S/ {f_soles(costo_fin)}</div>
-                                    </div>
-                                    <div style="text-align:center;">
-                                        <div style="font-size:12px; color:#64748b;">Variación Histórica</div>
-                                        <div style="font-size:18px; font-weight:bold; color:{var_color};">{variacion:+.1f}%</div>
-                                    </div>
-                                </div>
-                                ''', unsafe_allow_html=True)
+                                c1, c2, c3 = st.columns(3)
+                                with c1: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #94a3b8;"><div class="kpi-title">Costo Inicial ({año_ini})</div><div class="kpi-value" style="color:#334155;">S/ {f_soles(costo_ini)}</div></div>', unsafe_allow_html=True)
+                                with c2: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid #3b82f6;"><div class="kpi-title">Costo Actual ({año_fin})</div><div class="kpi-value" style="color:#334155;">S/ {f_soles(costo_fin)}</div></div>', unsafe_allow_html=True)
+                                with c3: st.markdown(f'<div class="kpi-container" style="border-top: 4px solid {var_color};"><div class="kpi-title">Variación Histórica</div><div class="kpi-value" style="color:{var_color};">{variacion:+.1f}%</div></div>', unsafe_allow_html=True)
+                                st.markdown("<br>", unsafe_allow_html=True)
                                 
                                 import plotly.express as px
                                 import plotly.graph_objects as go
@@ -1316,14 +1305,17 @@ with tab2:
                                 fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Costo_Actual'], mode='lines+markers', name='Costo Actual', line=dict(color='#ef4444', width=3)))
                                 
                                 fig.update_layout(
-                                    title='Curva de Variación del Costo vs Ejecución',
                                     yaxis_title="Soles (S/)",
                                     xaxis_title="Año Fiscal",
                                     hovermode="x unified",
-                                    margin=dict(l=20, r=20, t=40, b=20),
+                                    margin=dict(l=20, r=20, t=10, b=20),
                                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                                 )
+                                fig.update_xaxes(dtick=1)
+                                st.markdown('<div class="card-white">', unsafe_allow_html=True)
+                                st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Variación del Costo vs Ejecución</div>', unsafe_allow_html=True)
                                 st.plotly_chart(fig, use_container_width=True)
+                                st.markdown('</div>', unsafe_allow_html=True)
                                 
                                 all_years = set(str(y) for y in range(int(año_ini), int(año_fin) + 1))
                                 found_years = set(df_ssi_hist['Año'].astype(str))
@@ -1367,15 +1359,17 @@ with tab2:
                             fig_fis.add_trace(go.Scatter(x=df_curva_fis['Fecha'], y=df_curva_fis['Avance_Real'], mode='lines+markers', name='Avance Real %', line=dict(color='#3b82f6', width=3)))
                             
                             fig_fis.update_layout(
-                                title='Curva de Avance Físico',
                                 yaxis_title="Porcentaje (%)",
                                 xaxis_title="Mes de Avance",
                                 hovermode="x unified",
                                 yaxis=dict(range=[0, 105]),
-                                margin=dict(l=20, r=20, t=40, b=20),
+                                margin=dict(l=20, r=20, t=10, b=20),
                                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                             )
+                            st.markdown('<div class="card-white">', unsafe_allow_html=True)
+                            st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Avance Físico (Programado vs Real)</div>', unsafe_allow_html=True)
                             st.plotly_chart(fig_fis, use_container_width=True)
+                            st.markdown('</div>', unsafe_allow_html=True)
                         else:
                             st.info("No hay historial mensual de avance físico para esta obra en INFOBRAS.")
                     except Exception as e:
