@@ -659,47 +659,29 @@ with tab2:
         df_vs = conn.execute(vs_query).df()
         
         if not df_vs.empty:
+            import numpy as np
+            
             df_vs['Desbalance'] = df_vs['Avance Financiero % (MEF)'] - df_vs['Avance Físico % (INFOBRAS)'].fillna(0)
-            df_vs['Estado'] = df_vs.apply(lambda r: "⚠️ PARALIZADA" if r['Paralizada']==1 else ("⚠️ DESFASE (Financiero > Físico)" if r['Desbalance']>30 else "✅ Normal"), axis=1)
+            df_vs['Estado'] = np.where(df_vs['Paralizada']==1, "⚠️ PARALIZADA", 
+                                np.where(df_vs['Desbalance']>30, "⚠️ DESFASE (Financiero > Físico)", "✅ Normal"))
             
-            def asignar_gestion(row):
-                try:
-                    fecha = row['Fecha Inicio (INFOBRAS)']
-                    año = 0
-                    
-                    if not pd.isna(fecha) and str(fecha).strip():
-                        fecha_str = str(fecha).strip()
-                        if '0001' not in fecha_str and '1900' not in fecha_str:
-                            año_infobras = int(fecha_str.split('/')[-1][:4])
-                            if año_infobras >= 2000:
-                                año = año_infobras
-                    
-                    if año == 0 and not pd.isna(row['Anio_Inicio_MEF']):
-                        año = int(row['Anio_Inicio_MEF'])
-                        
-                    if año == 0: return "Sin Fecha Reportada"
-                    
-                    if año <= 2010: return "2007-2010 (Antigua)"
-                    elif 2011 <= año <= 2014: return "2011-2014"
-                    elif 2015 <= año <= 2018: return "2015-2018"
-                    elif 2019 <= año <= 2022: return "2019-2022"
-                    elif 2023 <= año <= 2026: return "2023-2026 (Actual)"
-                    else: return "Sin Fecha Reportada"
-                except:
-                    return "Sin Fecha Reportada"
-            df_vs['Gestión de Origen'] = df_vs.apply(asignar_gestion, axis=1)
+            # Vectorized Gestión de Origen
+            fecha_str = df_vs['Fecha Inicio (INFOBRAS)'].astype(str).str.strip()
+            year_infobras = pd.to_numeric(fecha_str.str.extract(r'(\d{4})$', expand=False), errors='coerce')
+            year_infobras = year_infobras.where((year_infobras >= 2000) & (year_infobras <= 2030), np.nan)
+            year_mef = pd.to_numeric(df_vs['Anio_Inicio_MEF'], errors='coerce')
+            final_year = year_infobras.fillna(year_mef).fillna(0).astype(int)
             
-            def asignar_estado_plazo(fecha_fin):
-                try:
-                    if pd.isna(fecha_fin) or not str(fecha_fin).strip(): return "Sin Cronograma"
-                    fecha_fin_dt = pd.to_datetime(fecha_fin, format='%d/%m/%Y', errors='coerce')
-                    if pd.isna(fecha_fin_dt): return "Sin Cronograma"
-                    
-                    if fecha_fin_dt < pd.Timestamp.now(): return "Plazo Vencido (Retraso/Liquidación)"
-                    else: return "En Plazo (Vigente)"
-                except:
-                    return "Sin Cronograma"
-            df_vs['Estado del Plazo'] = df_vs['Fecha Fin Prog. (INFOBRAS)'].apply(asignar_estado_plazo)
+            bins = [-1, 0, 2010, 2014, 2018, 2022, 2026, 9999]
+            labels = ['Sin Fecha Reportada', '2007-2010 (Antigua)', '2011-2014', '2015-2018', '2019-2022', '2023-2026 (Actual)', 'Sin Fecha Reportada']
+            df_vs['Gestión de Origen'] = pd.cut(final_year, bins=bins, labels=labels, ordered=False).astype(str)
+            df_vs['Gestión de Origen'] = df_vs['Gestión de Origen'].replace('nan', 'Sin Fecha Reportada')
+            
+            # Vectorized Estado del Plazo
+            fecha_fin = pd.to_datetime(df_vs['Fecha Fin Prog. (INFOBRAS)'], format='%d/%m/%Y', errors='coerce')
+            now = pd.Timestamp.now()
+            df_vs['Estado del Plazo'] = np.where(fecha_fin.isna(), 'Sin Cronograma', 
+                                         np.where(fecha_fin < now, 'Plazo Vencido (Retraso/Liquidación)', 'En Plazo (Vigente)'))
             # 1. Metodología Expandida (Arriba)
             with st.expander("📖 Clic aquí para ver la Metodología Matemática y Fórmulas de Auditoría"):
                 st.markdown("""
