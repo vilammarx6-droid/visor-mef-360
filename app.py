@@ -1358,7 +1358,7 @@ with tab2:
                                 st.markdown("<hr style='margin-top:20px; margin-bottom:20px; border-top:1px dashed #cbd5e1;'>", unsafe_allow_html=True)
                                 with st.container():
                                     st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Variación del Costo vs Ejecución</div>', unsafe_allow_html=True)
-                                    st.plotly_chart(fig, use_container_width=True)
+                                    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                                 
                                 all_years = set(str(y) for y in range(int(año_ini), int(año_fin) + 1))
                                 found_years = set(df_ssi_hist['Año'].astype(str))
@@ -1415,7 +1415,7 @@ with tab2:
                             st.markdown("<hr style='margin-top:20px; margin-bottom:20px; border-top:1px dashed #cbd5e1;'>", unsafe_allow_html=True)
                             with st.container():
                                 st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Avance Físico (Programado vs Real)</div>', unsafe_allow_html=True)
-                                st.plotly_chart(fig_fis, use_container_width=True)
+                                st.plotly_chart(fig_fis, use_container_width=True, config={'displayModeBar': False})
                         else:
                             st.info("No hay historial mensual de avance físico para esta obra en INFOBRAS.")
                     except Exception as e:
