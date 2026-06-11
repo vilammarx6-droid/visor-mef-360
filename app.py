@@ -1334,23 +1334,27 @@ with tab2:
                                 
                                 import plotly.express as px
                                 import plotly.graph_objects as go
+                                import pandas as pd
+                                
+                                # Insertar punto 'Viable' para la gráfica
+                                df_chart = pd.DataFrame([{'Año': 'Viable', 'Costo_Actual': costo_viable, 'Ejecucion_Total': 0}])
+                                df_chart = pd.concat([df_chart, df_ssi_hist], ignore_index=True)
                                 
                                 fig = go.Figure()
-                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Ejecucion_Total'], mode='lines', fill='tozeroy', name='Ejecución', line=dict(color='#0ea5e9', width=2), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
-                                fig.add_trace(go.Scatter(x=df_ssi_hist['Año'], y=df_ssi_hist['Costo_Actual'], mode='lines+markers', name='Costo', line=dict(color='#ef4444', width=3), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
+                                fig.add_trace(go.Scatter(x=df_chart['Año'], y=df_chart['Ejecucion_Total'], mode='lines+markers', fill='tozeroy', name='Ejecución Acumulada', line=dict(color='#0ea5e9', width=2), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
+                                fig.add_trace(go.Scatter(x=df_chart['Año'], y=df_chart['Costo_Actual'], mode='lines+markers', name='Costo del Proyecto', line=dict(color='#ef4444', width=3), hovertemplate='S/ %{y:,.0f}<extra></extra>'))
                                 
                                 fig.update_layout(
                                     yaxis_title="Soles (S/)",
-                                    xaxis_title="Año Fiscal",
+                                    xaxis_title="",
                                     hovermode="x unified",
                                     plot_bgcolor='rgba(0,0,0,0)',
                                     paper_bgcolor='rgba(0,0,0,0)',
-                                    xaxis=dict(showgrid=False, zeroline=False, showspikes=True, spikemode='across', spikethickness=1, spikedash='solid', spikecolor='#94a3b8'),
-                                    yaxis=dict(showgrid=True, gridcolor='#f1f5f9', zeroline=False),
+                                    xaxis=dict(type='category', showgrid=False, zeroline=False, showspikes=True, spikemode='across', spikethickness=1, spikedash='solid', spikecolor='#94a3b8'),
+                                    yaxis=dict(showgrid=True, gridcolor='#f1f5f9', zeroline=False, rangemode='tozero'),
                                     margin=dict(l=20, r=20, t=10, b=20),
                                     legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                                 )
-                                fig.update_xaxes(dtick=1)
                                 st.markdown("<hr style='margin-top:20px; margin-bottom:20px; border-top:1px dashed #cbd5e1;'>", unsafe_allow_html=True)
                                 with st.container():
                                     st.markdown('<div style="font-weight:bold; font-size:16px; color:#0f172a; margin-bottom: 5px;">📈 Curva de Variación del Costo vs Ejecución</div>', unsafe_allow_html=True)
