@@ -117,7 +117,7 @@ def get_latest_parquet_and_download():
             url = f"https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{file}"
             with st.spinner(f"Descargando {file} desde HuggingFace (Puede tardar 1-2 min)..."):
                 try:
-                    response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'}, timeout=(15, 120))
+                    response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'}, timeout=300)
                     if response.status_code == 200:
                         with open(file, 'wb') as f:
                             for chunk in response.iter_content(chunk_size=1024*1024): 
@@ -290,7 +290,7 @@ with tab1:
         url = f"https://huggingface.co/datasets/marxvilam/mef-datos/resolve/main/{DYNAMIC_PARQUET}"
         with st.spinner(f"Descargando datos históricos de {tab1_year}..."):
             try:
-                response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'}, timeout=(15, 120))
+                response = requests.get(url, stream=True, headers={'User-Agent': 'Mozilla/5.0'}, timeout=300)
                 if response.status_code == 200:
                     with open(DYNAMIC_PARQUET, 'wb') as f:
                         for chunk in response.iter_content(chunk_size=1024*1024): 
@@ -648,6 +648,7 @@ with tab2:
                 ROUND(TRY_CAST(i.AVANCE_FISICO_INFOBRAS AS DOUBLE), 1) as "Avance Físico % (INFOBRAS)",
                 i.Fecha_de_inicio_de_obra as "Fecha Inicio (INFOBRAS)",
                 s.Anio_Inicio_MEF as "Año Inicio (MEF)",
+                s.Anio_Fin_MEF as "Último Año (MEF)",
                 i.Fecha_finalizaci_n_programada_de_obra as "Fecha Fin Prog. (INFOBRAS)",
                 COALESCE(i.Tiene_Liquidacion, 'No') as "Liquidada",
                 i.Fecha_Liquidacion as "Fecha Liquidación",
@@ -678,7 +679,10 @@ with tab2:
             year_infobras = pd.to_numeric(fecha_str.str.extract(r'(\d{4})$', expand=False), errors='coerce')
             year_infobras = year_infobras.where((year_infobras >= 2000) & (year_infobras <= 2030), np.nan)
             year_mef = pd.to_numeric(df_vs['Año Inicio (MEF)'], errors='coerce')
-            final_year = year_infobras.fillna(year_mef).fillna(0).astype(int)
+            
+            # Tomamos el año más antiguo entre MEF e INFOBRAS para conocer la VERDADERA gestión de origen
+            df_years = pd.DataFrame({'inf': year_infobras, 'mef': year_mef})
+            final_year = df_years.min(axis=1).fillna(0).astype(int)
             
             bins = [-1, 0, 2010, 2014, 2018, 2022, 2026, 9999]
             labels = ['Sin Fecha Reportada', '2007-2010 (Antigua)', '2011-2014', '2015-2018', '2019-2022', '2023-2026 (Actual)', 'Sin Fecha Reportada']
@@ -1575,7 +1579,7 @@ with tab5:
         st.markdown("<br>", unsafe_allow_html=True)
         
         # Limpiar columnas para mostrar
-        cols_mostrar = ['CUI', 'Nombre', 'Gestión de Origen', 'Año Inicio (MEF)', 'Fecha Inicio (INFOBRAS)', 'Fecha Liquidación', 
+        cols_mostrar = ['CUI', 'Nombre', 'Gestión de Origen', 'Año Inicio (MEF)', 'Último Año (MEF)', 'Fecha Inicio (INFOBRAS)', 'Fecha Liquidación', 
                         'Avance Físico % (INFOBRAS)', 'Avance Financiero % (MEF)', 'Estado (INFOBRAS)', 'COSTO_ACTUAL', 'MONTO_EJECUCION_TOTAL', 'Residente', 'Supervisor']
         
         # Filtrar solo columnas que existan
