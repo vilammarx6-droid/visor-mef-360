@@ -149,6 +149,8 @@ try:
 except:
     CURRENT_YEAR = "Actual"
 conn = duckdb.connect(database=':memory:')
+conn.execute("PRAGMA memory_limit='500MB'")
+conn.execute("PRAGMA threads=2")
 
 # ==========================================
 # SIDEBAR INTUITIVO (UX MEJORADA)
@@ -250,6 +252,16 @@ if f_only_infobras:
     where_clause += " AND PRODUCTO_PROYECTO IN (SELECT DISTINCT CAST(TRY_CAST(CUI_INFOBRAS AS BIGINT) AS VARCHAR) FROM 'infobras_avance.parquet')"
 
 st.sidebar.markdown("<br>", unsafe_allow_html=True)
+
+st.sidebar.markdown("""
+<div style="background-color: #f1f5f9; padding: 12px; border-radius: 8px; margin-bottom: 20px; font-size: 12.5px; color: #475569; border-left: 4px solid #3b82f6;">
+    <b style="color: #0f172a;">• PROYECTOS (MEF - Universo Histórico): 279,351</b><br>
+    Esta es la cantidad de CUIs que han nacido en el Perú desde el 2014. Aquí están todos: los que ya terminaron, los que están en ejecución hoy, y los que se abandonaron.<br><br>
+    <b style="color: #0f172a;">• OBRAS (Contraloría/Infobras - Universo Histórico): 191,180</b><br>
+    Esta es la cantidad de registros de construcción física que tiene la Contraloría (de los cuales 82,588 ya están liquidados).
+</div>
+""", unsafe_allow_html=True)
+
 st.sidebar.markdown("""
 <a href="#" style="display: block; background-color: #7c3aed; color: white; text-align: center; padding: 12px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">
     💜 Apoyar el Proyecto (Donar)
